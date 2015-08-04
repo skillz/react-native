@@ -352,7 +352,9 @@ RCT_NOT_IMPLEMENTED(-init)
     }
   }];
 
-  return stickyHeader ?: [super hitTest:point withEvent:event];
+  CGPoint convertedPoint = [stickyHeader convertPoint:point fromView:self];
+  return stickyHeader ? [stickyHeader hitTest:convertedPoint withEvent:event] :
+                        [super hitTest:point withEvent:event];
 }
 
 @end
