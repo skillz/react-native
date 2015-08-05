@@ -339,22 +339,16 @@ RCT_NOT_IMPLEMENTED(-init)
 
 - (UIView *)hitTest:(CGPoint)point withEvent:(UIEvent *)event
 {
-  __block UIView *stickyHeader;
+  __block UIView *hitView;
 
   [_stickyHeaderIndices enumerateIndexesWithOptions:0 usingBlock:^(NSUInteger idx, BOOL *stop) {
-    stickyHeader = [self contentView].reactSubviews[idx];
+    UIView *stickyHeader = [self contentView].reactSubviews[idx];
     CGPoint convertedPoint = [stickyHeader convertPoint:point fromView:self];
-
-    if ([stickyHeader hitTest:convertedPoint withEvent:event]) {
-      *stop = YES;
-    } else {
-      stickyHeader = nil;
-    }
+    hitView = [stickyHeader hitTest:convertedPoint withEvent:event];
+    *stop = (hitView != nil);
   }];
 
-  CGPoint convertedPoint = [stickyHeader convertPoint:point fromView:self];
-  return stickyHeader ? [stickyHeader hitTest:convertedPoint withEvent:event] :
-                        [super hitTest:point withEvent:event];
+  return hitView ?: [super hitTest:point withEvent:event];
 }
 
 @end
