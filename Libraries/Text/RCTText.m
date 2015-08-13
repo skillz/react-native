@@ -15,7 +15,7 @@
 
 @interface RCTText ()
 
-@property NSTextStorage *originalStorage;
+@property NSAttributedString *originalString;
 
 @end
 
@@ -31,7 +31,9 @@
   if ((self = [super initWithFrame:frame])) {
     _textStorage = [[NSTextStorage alloc] init];
     _reactSubviews = [NSMutableArray array];
-
+    _minimumFontScale = .5;
+    _adjustsFontSizeToFitWidth = YES;
+    
     self.isAccessibilityElement = YES;
     self.accessibilityTraits |= UIAccessibilityTraitStaticText;
 
@@ -76,7 +78,9 @@
 - (void)setTextStorage:(NSTextStorage *)textStorage
 {
   _textStorage = textStorage;
-  _originalStorage = [textStorage mutableCopy];
+  //This produces an NSMutableAttributedString and not an NSTextStorage
+  //(Perhaps resolve by doing this on purpose instead of via this mutableCopy side effect?)
+  _originalString = [textStorage mutableCopy];
 
   [self setNeedsDisplay];
 }
@@ -88,7 +92,9 @@
   NSRange glyphRange = [layoutManager glyphRangeForTextContainer:textContainer];
 
   CGRect textFrame = UIEdgeInsetsInsetRect(self.bounds, _contentInset);
-  textFrame = [self updateToFitFrame:textFrame];
+  if (_adjustsFontSizeToFitWidth) {
+    textFrame = [self updateToFitFrame:textFrame];
+  }
 
   [layoutManager drawBackgroundForGlyphRange:glyphRange atPoint:textFrame.origin];
   [layoutManager drawGlyphsForGlyphRange:glyphRange atPoint:textFrame.origin];
@@ -163,10 +169,10 @@
 
 - (CGRect)updateToFitFrame:(CGRect)frame
 {
-  if ([_textStorage.string rangeOfString:@"No description"].location != NSNotFound) {
+
+  if ([_textStorage.string rangeOfString:@"ENTER MATCH CODE"].location != NSNotFound) {
     NSLog(@"stop");
   }
-  
   NSLayoutManager *layoutManager = [_textStorage.layoutManagers firstObject];
   NSTextContainer *textContainer = [layoutManager.textContainers firstObject];
   [textContainer setLineBreakMode:NSLineBreakByWordWrapping];
@@ -177,11 +183,13 @@
 
   CGSize requiredSize = [self calculateSize:_textStorage];
   NSInteger linesRequired = [self numberOfLinesRequired:layoutManager];
-// (linesRequired > textContainer.maximumNumberOfLines && textContainer.maximumNumberOfLines != 0)
-  while (requiredSize.height > CGRectGetHeight(frame) ||
-         requiredSize.width > CGRectGetWidth(frame))
+
+  __block BOOL hitMinimumScale = NO;
+  while ((requiredSize.height > CGRectGetHeight(frame) ||
+         requiredSize.width > CGRectGetWidth(frame) ||
+         (linesRequired > textContainer.maximumNumberOfLines && textContainer.maximumNumberOfLines != 0))
+         && !hitMinimumScale)
   {
-    NSLog(@"Dropping font size");
     [_textStorage beginEditing];
     [_textStorage enumerateAttribute:NSFontAttributeName
                              inRange:glyphRange
@@ -189,9 +197,16 @@
                           usingBlock:^(UIFont *font, NSRange range, BOOL *stop)
     {
       if (font) {
+        UIFont *originalFont = [_originalString attribute:NSFontAttributeName
+                                                  atIndex:range.location
+                                           effectiveRange:&range];
         UIFont *newFont = [font fontWithSize:font.pointSize - 1];
-        [_textStorage removeAttribute:NSFontAttributeName range:range];
-        [_textStorage addAttribute:NSFontAttributeName value:newFont range:range];
+        if (newFont.pointSize > originalFont.pointSize * self.minimumFontScale) {
+          [_textStorage removeAttribute:NSFontAttributeName range:range];
+          [_textStorage addAttribute:NSFontAttributeName value:newFont range:range];
+        } else {
+          hitMinimumScale = YES;
+        }
       }
     }];
 
@@ -201,14 +216,13 @@
     requiredSize = [self calculateSize:_textStorage];
   }
 
-  //Center draw position;
-  frame.origin.y = round((CGRectGetHeight(frame) - requiredSize.height) / 2);
+  //Vertically center draw position
+  frame.origin.y = _contentInset.top + round((CGRectGetHeight(frame) - requiredSize.height) / 2);
   return frame;
 }
 
 - (NSInteger)numberOfLinesRequired:(NSLayoutManager *)layoutManager
 {
-  (void) [layoutManager glyphRangeForTextContainer:layoutManager.textContainers.firstObject];
   NSInteger numberOfLines, index, numberOfGlyphs = [layoutManager numberOfGlyphs];
   NSRange lineRange;
   for (numberOfLines = 0, index = 0; index < numberOfGlyphs; numberOfLines++){
@@ -230,41 +244,16 @@
 
 - (void)resetDrawnTextStorage
 {
-  NSLayoutManager *layoutManager = [_textStorage.layoutManagers firstObject];
-  NSTextContainer *textContainer = [layoutManager.textContainers firstObject];
-  NSRange glyphRange = [layoutManager glyphRangeForTextContainer:textContainer];
-
+  //Start fresh with the original string each time.
   [_textStorage beginEditing];
-  NSRange originalRange = NSMakeRange(0, _originalStorage.length);
+  NSRange originalRange = NSMakeRange(0, _originalString.length);
 
   [_textStorage setAttributes:@{}
                         range:originalRange];
 
-  [_originalStorage enumerateAttributesInRange:glyphRange options:0 usingBlock:^(NSDictionary *attrs, NSRange range, BOOL *stop) {
+  [_originalString enumerateAttributesInRange:originalRange options:0 usingBlock:^(NSDictionary *attrs, NSRange range, BOOL *stop) {
     [_textStorage setAttributes:attrs range:range];
   }];
-
- // __block BOOL foundPara = NO;
-/*  [_textStorage enumerateAttribute:NSParagraphStyleAttributeName
-                           inRange:glyphRange
-                           options:0
-                        usingBlock:^(NSParagraphStyle *para, NSRange range, BOOL *stop)
-   {
-     if (para) {
-       foundPara = YES;
-       
-       [_textStorage removeAttribute:NSParagraphStyleAttributeName range:range];
-       NSMutableParagraphStyle *newPara = [para mutableCopy];
-       [newPara setLineBreakMode:NSLineBreakByWordWrapping];
-       [_textStorage addAttribute:NSParagraphStyleAttributeName value:newPara range:range];
-     }
-   }];*/
-
-  /*if (!foundPara) {
-    NSMutableParagraphStyle *newPara = [NSMutableParagraphStyle new];
-    [newPara setLineBreakMode:NSLineBreakByWordWrapping];
-    [_textStorage addAttribute:NSParagraphStyleAttributeName value:newPara range:glyphRange];
-  }*/
 
   [_textStorage endEditing];
 }
