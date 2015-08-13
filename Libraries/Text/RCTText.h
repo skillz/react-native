@@ -14,4 +14,7 @@
 @property (nonatomic, assign) UIEdgeInsets contentInset;
 @property (nonatomic, strong) NSTextStorage *textStorage;
 
+@property (nonatomic, assign) BOOL adjustsFontSizeToFit;
+@property (nonatomic, assign) CGFloat minimumFontScale;
+
 @end
