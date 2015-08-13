@@ -169,10 +169,6 @@
 
 - (CGRect)updateToFitFrame:(CGRect)frame
 {
-
-  if ([_textStorage.string rangeOfString:@"ENTER MATCH CODE"].location != NSNotFound) {
-    NSLog(@"stop");
-  }
   NSLayoutManager *layoutManager = [_textStorage.layoutManagers firstObject];
   NSTextContainer *textContainer = [layoutManager.textContainers firstObject];
   [textContainer setLineBreakMode:NSLineBreakByWordWrapping];
@@ -187,7 +183,8 @@
   __block BOOL hitMinimumScale = NO;
   while ((requiredSize.height > CGRectGetHeight(frame) ||
          requiredSize.width > CGRectGetWidth(frame) ||
-         (linesRequired > textContainer.maximumNumberOfLines && textContainer.maximumNumberOfLines != 0))
+         (linesRequired > textContainer.maximumNumberOfLines &&
+          textContainer.maximumNumberOfLines != 0))
          && !hitMinimumScale)
   {
     [_textStorage beginEditing];
@@ -200,7 +197,7 @@
         UIFont *originalFont = [_originalString attribute:NSFontAttributeName
                                                   atIndex:range.location
                                            effectiveRange:&range];
-        UIFont *newFont = [font fontWithSize:font.pointSize - 1];
+        UIFont *newFont = [font fontWithSize:font.pointSize - .5];
         if (newFont.pointSize > originalFont.pointSize * self.minimumFontScale) {
           [_textStorage removeAttribute:NSFontAttributeName range:range];
           [_textStorage addAttribute:NSFontAttributeName value:newFont range:range];
@@ -209,7 +206,6 @@
         }
       }
     }];
-
     [_textStorage endEditing];
 
     linesRequired = [self numberOfLinesRequired:layoutManager];
@@ -221,6 +217,8 @@
   return frame;
 }
 
+// Via Apple Text Layout Programming Guide
+// https://developer.apple.com/library/mac/documentation/Cocoa/Conceptual/TextLayout/Tasks/CountLines.html
 - (NSInteger)numberOfLinesRequired:(NSLayoutManager *)layoutManager
 {
   NSInteger numberOfLines, index, numberOfGlyphs = [layoutManager numberOfGlyphs];
@@ -234,6 +232,8 @@
   return numberOfLines;
 }
 
+// Via Apple Text Layout Programming Guide
+//https://developer.apple.com/library/mac/documentation/Cocoa/Conceptual/TextLayout/Tasks/StringHeight.html
 - (CGSize)calculateSize:(NSTextStorage *)storage
 {
   NSLayoutManager *layoutManager = [storage.layoutManagers firstObject];
@@ -242,16 +242,18 @@
   return [layoutManager usedRectForTextContainer:textContainer].size;
 }
 
+//Start fresh with the original drawn string each time, in case frame has gotten larger
 - (void)resetDrawnTextStorage
 {
-  //Start fresh with the original string each time.
   [_textStorage beginEditing];
+
   NSRange originalRange = NSMakeRange(0, _originalString.length);
+  [_textStorage setAttributes:@{} range:originalRange];
 
-  [_textStorage setAttributes:@{}
-                        range:originalRange];
-
-  [_originalString enumerateAttributesInRange:originalRange options:0 usingBlock:^(NSDictionary *attrs, NSRange range, BOOL *stop) {
+  [_originalString enumerateAttributesInRange:originalRange
+                                      options:0
+                                   usingBlock:^(NSDictionary *attrs, NSRange range, BOOL *stop)
+  {
     [_textStorage setAttributes:attrs range:range];
   }];
 
