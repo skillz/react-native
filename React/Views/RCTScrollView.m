@@ -98,12 +98,12 @@ RCT_NOT_IMPLEMENTED(-init)
 - (NSString *)eventName
 {
   static NSString *events[] = {
-    @"topScrollBeginDrag",
-    @"topScroll",
-    @"topScrollEndDrag",
-    @"topMomentumScrollBegin",
-    @"topMomentumScrollEnd",
-    @"topScrollAnimationEnd",
+    @"scrollBeginDrag",
+    @"scroll",
+    @"scrollEndDrag",
+    @"momentumScrollBegin",
+    @"momentumScrollEnd",
+    @"scrollAnimationEnd",
   };
 
   return events[_type];
@@ -123,7 +123,7 @@ RCT_NOT_IMPLEMENTED(-init)
     userData[@"updatedChildFrames"] = updatedChildFrames;
     newEvent->_userData = userData;
   }
-  
+
   return newEvent;
 }
 
@@ -457,7 +457,10 @@ RCT_NOT_IMPLEMENTED(-initWithCoder:(NSCoder *)aDecoder)
   [super layoutSubviews];
   RCTAssert(self.subviews.count == 1, @"we should only have exactly one subview");
   RCTAssert([self.subviews lastObject] == _scrollView, @"our only subview should be a scrollview");
+
+  CGPoint originalOffset = _scrollView.contentOffset;
   _scrollView.frame = self.bounds;
+  _scrollView.contentOffset = originalOffset;
 
   [RCTView autoAdjustInsetsForView:self
                     withScrollView:_scrollView
