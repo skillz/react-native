@@ -15,7 +15,8 @@
 
 @interface RCTText ()
 
-@property NSAttributedString *originalString;
+@property (nonatomic, strong) NSAttributedString *originalString;
+@property (nonatomic, assign) CGRect textFrame;
 
 @end
 
@@ -81,23 +82,23 @@
   //This produces an NSMutableAttributedString and not an NSTextStorage
   //(Perhaps resolve by doing this on purpose instead of via this mutableCopy side effect?)
   _originalString = [textStorage mutableCopy];
+  [self calculateTextFrame];
+}
 
-  [self setNeedsDisplay];
+- (void)setFrame:(CGRect)frame
+{
+  [super setFrame:frame];
+  [self calculateTextFrame];
 }
 
 - (void)drawRect:(CGRect)rect
 {
   NSLayoutManager *layoutManager = [_textStorage.layoutManagers firstObject];
   NSTextContainer *textContainer = [layoutManager.textContainers firstObject];
+
   NSRange glyphRange = [layoutManager glyphRangeForTextContainer:textContainer];
-
-  CGRect textFrame = UIEdgeInsetsInsetRect(self.bounds, _contentInset);
-  if (_adjustsFontSizeToFit) {
-    textFrame = [self updateToFitFrame:textFrame];
-  }
-
-  [layoutManager drawBackgroundForGlyphRange:glyphRange atPoint:textFrame.origin];
-  [layoutManager drawGlyphsForGlyphRange:glyphRange atPoint:textFrame.origin];
+  [layoutManager drawBackgroundForGlyphRange:glyphRange atPoint:self.textFrame.origin];
+  [layoutManager drawGlyphsForGlyphRange:glyphRange atPoint:self.textFrame.origin];
 
   __block UIBezierPath *highlightPath = nil;
   NSRange characterRange = [layoutManager characterRangeForGlyphRange:glyphRange actualGlyphRange:NULL];
@@ -167,6 +168,16 @@
 
 #pragma mark Sizing
 
+- (void)calculateTextFrame
+{
+  self.textFrame = UIEdgeInsetsInsetRect(self.bounds, _contentInset);
+  if (_adjustsFontSizeToFit) {
+    self.textFrame = [self updateToFitFrame:self.textFrame];
+  }
+
+  [self setNeedsDisplay];
+}
+
 - (CGRect)updateToFitFrame:(CGRect)frame
 {
   NSLayoutManager *layoutManager = [_textStorage.layoutManagers firstObject];
@@ -213,7 +224,7 @@
   }
 
   //Vertically center draw position
-  frame.origin.y = _contentInset.top + round((CGRectGetHeight(frame) - requiredSize.height) / 2);
+  frame.origin.y = _contentInset.top + RCTRoundPixelValue((CGRectGetHeight(frame) - requiredSize.height) / 2);
   return frame;
 }
 
