@@ -32,7 +32,7 @@
   if ((self = [super initWithFrame:frame])) {
     _textStorage = [[NSTextStorage alloc] init];
     _reactSubviews = [NSMutableArray array];
-    _minimumFontScale = 0.0;
+    _minimumFontScale = 0.5;
     _adjustsFontSizeToFit = NO;
     
     self.isAccessibilityElement = YES;
@@ -166,7 +166,17 @@
   }
 }
 
-#pragma mark Sizing
+#pragma mark Autosizing
+
+NSInteger RCTTextAutoSizeErrorMargin          = 5;
+CGFloat RCTTextAutoSizeGranularity            = 0.001;
+
+typedef NS_ENUM(NSInteger, RCTSizeComparison)
+{
+  RCTSizeTooLarge,
+  RCTSizeTooSmall,
+  RCTSizeWithinRange,
+};
 
 - (void)calculateTextFrame
 {
@@ -180,52 +190,90 @@
 
 - (CGRect)updateToFitFrame:(CGRect)frame
 {
-  NSLayoutManager *layoutManager = [_textStorage.layoutManagers firstObject];
-  NSTextContainer *textContainer = [layoutManager.textContainers firstObject];
-  [textContainer setLineBreakMode:NSLineBreakByWordWrapping];
-  
-  NSRange glyphRange = NSMakeRange(0, _textStorage.length);
-
   [self resetDrawnTextStorage];
 
-  CGSize requiredSize = [self calculateSize:_textStorage];
-  NSInteger linesRequired = [self numberOfLinesRequired:layoutManager];
-
-  __block BOOL hitMinimumScale = NO;
-  while ((requiredSize.height > CGRectGetHeight(frame) ||
-         requiredSize.width > CGRectGetWidth(frame) ||
-         (linesRequired > textContainer.maximumNumberOfLines &&
-          textContainer.maximumNumberOfLines != 0))
-         && !hitMinimumScale)
-  {
-    [_textStorage beginEditing];
-    [_textStorage enumerateAttribute:NSFontAttributeName
-                             inRange:glyphRange
-                             options:0
-                          usingBlock:^(UIFont *font, NSRange range, BOOL *stop)
-    {
-      if (font) {
-        UIFont *originalFont = [_originalString attribute:NSFontAttributeName
-                                                  atIndex:range.location
-                                           effectiveRange:&range];
-        UIFont *newFont = [font fontWithSize:font.pointSize - .5];
-        if (newFont.pointSize > originalFont.pointSize * self.minimumFontScale) {
-          [_textStorage removeAttribute:NSFontAttributeName range:range];
-          [_textStorage addAttribute:NSFontAttributeName value:newFont range:range];
-        } else {
-          hitMinimumScale = YES;
-        }
-      }
-    }];
-    [_textStorage endEditing];
-
-    linesRequired = [self numberOfLinesRequired:layoutManager];
+  BOOL fits = [self checkScale:1.0f
+                      forFrame:frame];
+  CGSize requiredSize;
+  if (!fits) {
+    requiredSize = [self calculateOptimumScaleInFrame:frame
+                                             minScale:self.minimumFontScale
+                                             maxScale:1.0];
+  } else {
     requiredSize = [self calculateSize:_textStorage];
   }
 
   //Vertically center draw position
-  frame.origin.y = _contentInset.top + RCTRoundPixelValue((CGRectGetHeight(frame) - requiredSize.height) / 2);
+  frame.origin.y = _contentInset.top + RCTRoundPixelValue((CGRectGetHeight(frame) - requiredSize.height) / 2.0f);
   return frame;
+}
+
+- (CGSize)calculateOptimumScaleInFrame:(CGRect)frame
+                              minScale:(CGFloat)minScale
+                              maxScale:(CGFloat)maxScale
+{
+  CGFloat midScale = (minScale + maxScale) / 2.0f;
+  NSLog(@"\nMin: %.2f\nMid: %.2f\nMax %.2f", minScale, midScale, maxScale);
+  
+  RCTSizeComparison comparison = [self checkScale:midScale forFrame:frame];
+  if (comparison == RCTSizeWithinRange) {
+    return [self calculateSize:_textStorage];
+  } else if (comparison == RCTSizeTooLarge) {
+    return [self calculateOptimumScaleInFrame:frame
+                                     minScale:minScale
+                                     maxScale:midScale - RCTTextAutoSizeGranularity];
+  } else {
+    return [self calculateOptimumScaleInFrame:frame
+                                     minScale:midScale + RCTTextAutoSizeGranularity
+                                     maxScale:maxScale];
+  }
+}
+
+- (RCTSizeComparison)checkScale:(CGFloat)scale
+                       forFrame:(CGRect)frame
+{
+  NSLayoutManager *layoutManager = [_textStorage.layoutManagers firstObject];
+  NSTextContainer *textContainer = [layoutManager.textContainers firstObject];
+
+  NSRange glyphRange = NSMakeRange(0, _textStorage.length);
+  [_textStorage beginEditing];
+  [_textStorage enumerateAttribute:NSFontAttributeName
+                           inRange:glyphRange
+                           options:0
+                        usingBlock:^(UIFont *font, NSRange range, BOOL *stop)
+   {
+     if (font) {
+       UIFont *originalFont = [_originalString attribute:NSFontAttributeName
+                                                 atIndex:range.location
+                                          effectiveRange:&range];
+       UIFont *newFont = [font fontWithSize:originalFont.pointSize * scale];
+       [_textStorage removeAttribute:NSFontAttributeName range:range];
+       [_textStorage addAttribute:NSFontAttributeName value:newFont range:range];
+     }
+   }];
+
+  [_textStorage endEditing];
+
+  NSInteger linesRequired = [self numberOfLinesRequired:[_textStorage.layoutManagers firstObject]];
+  CGSize requiredSize = [self calculateSize:_textStorage];
+
+  BOOL fitSize = requiredSize.height <= CGRectGetHeight(frame) &&
+                 requiredSize.width <= CGRectGetWidth(frame);
+
+  BOOL fitLines = linesRequired <= textContainer.maximumNumberOfLines ||
+                                   textContainer.maximumNumberOfLines == 0;
+
+  if (fitLines && fitSize) {
+    if ((requiredSize.height + RCTTextAutoSizeErrorMargin) > CGRectGetHeight(frame) ||
+        (requiredSize.width + RCTTextAutoSizeErrorMargin) > CGRectGetWidth(frame))
+    {
+      return RCTSizeWithinRange;
+    } else {
+      return RCTSizeTooSmall;
+    }
+  } else {
+    return RCTSizeTooLarge;
+  }
 }
 
 // Via Apple Text Layout Programming Guide
@@ -249,6 +297,7 @@
 {
   NSLayoutManager *layoutManager = [storage.layoutManagers firstObject];
   NSTextContainer *textContainer = [layoutManager.textContainers firstObject];
+
   (void) [layoutManager glyphRangeForTextContainer:textContainer];
   return [layoutManager usedRectForTextContainer:textContainer].size;
 }
