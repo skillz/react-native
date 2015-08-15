@@ -13,6 +13,11 @@
 #import "RCTUtils.h"
 #import "UIView+React.h"
 
+static CGFloat const RCTTextAutoSizeDefaultMinimumFontScale       = 0.5f;
+static CGFloat const RCTTextAutoSizeWidthErrorMargin              = 0.05f;
+static CGFloat const RCTTextAutoSizeHeightErrorMargin             = 0.15f;
+static CGFloat const RCTTextAutoSizeGranularity                   = 0.01f;
+
 @interface RCTText ()
 
 @property (nonatomic, strong) NSAttributedString *originalString;
@@ -32,7 +37,7 @@
   if ((self = [super initWithFrame:frame])) {
     _textStorage = [[NSTextStorage alloc] init];
     _reactSubviews = [NSMutableArray array];
-    _minimumFontScale = 0.5;
+    _minimumFontScale = RCTTextAutoSizeDefaultMinimumFontScale;
     _adjustsFontSizeToFit = NO;
     
     self.isAccessibilityElement = YES;
@@ -168,16 +173,6 @@
 
 #pragma mark Autosizing
 
-NSInteger RCTTextAutoSizeErrorMargin          = 5;
-CGFloat RCTTextAutoSizeGranularity            = 0.001;
-
-typedef NS_ENUM(NSInteger, RCTSizeComparison)
-{
-  RCTSizeTooLarge,
-  RCTSizeTooSmall,
-  RCTSizeWithinRange,
-};
-
 - (void)calculateTextFrame
 {
   self.textFrame = UIEdgeInsetsInsetRect(self.bounds, _contentInset);
@@ -198,7 +193,8 @@ typedef NS_ENUM(NSInteger, RCTSizeComparison)
   if (!fits) {
     requiredSize = [self calculateOptimumScaleInFrame:frame
                                              minScale:self.minimumFontScale
-                                             maxScale:1.0];
+                                             maxScale:1.0
+                                              prevMid:INT_MAX];
   } else {
     requiredSize = [self calculateSize:_textStorage];
   }
@@ -211,21 +207,27 @@ typedef NS_ENUM(NSInteger, RCTSizeComparison)
 - (CGSize)calculateOptimumScaleInFrame:(CGRect)frame
                               minScale:(CGFloat)minScale
                               maxScale:(CGFloat)maxScale
+                               prevMid:(CGFloat)prevMid
 {
   CGFloat midScale = (minScale + maxScale) / 2.0f;
-  NSLog(@"\nMin: %.2f\nMid: %.2f\nMax %.2f", minScale, midScale, maxScale);
-  
-  RCTSizeComparison comparison = [self checkScale:midScale forFrame:frame];
-  if (comparison == RCTSizeWithinRange) {
+  if (round((prevMid / RCTTextAutoSizeGranularity)) == round((midScale / RCTTextAutoSizeGranularity))) {
+    //Bail because we can't meet error margin.
     return [self calculateSize:_textStorage];
-  } else if (comparison == RCTSizeTooLarge) {
-    return [self calculateOptimumScaleInFrame:frame
-                                     minScale:minScale
-                                     maxScale:midScale - RCTTextAutoSizeGranularity];
   } else {
-    return [self calculateOptimumScaleInFrame:frame
-                                     minScale:midScale + RCTTextAutoSizeGranularity
-                                     maxScale:maxScale];
+    RCTSizeComparison comparison = [self checkScale:midScale forFrame:frame];
+    if (comparison == RCTSizeWithinRange) {
+      return [self calculateSize:_textStorage];
+    } else if (comparison == RCTSizeTooLarge) {
+      return [self calculateOptimumScaleInFrame:frame
+                                       minScale:minScale
+                                       maxScale:midScale - RCTTextAutoSizeGranularity
+                                        prevMid:midScale];
+    } else {
+      return [self calculateOptimumScaleInFrame:frame
+                                       minScale:midScale + RCTTextAutoSizeGranularity
+                                       maxScale:maxScale
+                                        prevMid:midScale];
+    }
   }
 }
 
@@ -264,8 +266,8 @@ typedef NS_ENUM(NSInteger, RCTSizeComparison)
                                    textContainer.maximumNumberOfLines == 0;
 
   if (fitLines && fitSize) {
-    if ((requiredSize.height + RCTTextAutoSizeErrorMargin) > CGRectGetHeight(frame) ||
-        (requiredSize.width + RCTTextAutoSizeErrorMargin) > CGRectGetWidth(frame))
+    if ((requiredSize.height + (CGRectGetHeight(frame) * RCTTextAutoSizeHeightErrorMargin)) > CGRectGetHeight(frame) &&
+        (requiredSize.width + (CGRectGetWidth(frame) * RCTTextAutoSizeWidthErrorMargin)) > CGRectGetWidth(frame))
     {
       return RCTSizeWithinRange;
     } else {
@@ -298,8 +300,14 @@ typedef NS_ENUM(NSInteger, RCTSizeComparison)
   NSLayoutManager *layoutManager = [storage.layoutManagers firstObject];
   NSTextContainer *textContainer = [layoutManager.textContainers firstObject];
 
+  [textContainer setLineBreakMode:NSLineBreakByWordWrapping];
+  NSInteger maxLines = [textContainer maximumNumberOfLines];
+  [textContainer setMaximumNumberOfLines:0];
   (void) [layoutManager glyphRangeForTextContainer:textContainer];
-  return [layoutManager usedRectForTextContainer:textContainer].size;
+  CGSize requiredSize = [layoutManager usedRectForTextContainer:textContainer].size;
+  [textContainer setMaximumNumberOfLines:maxLines];
+
+  return requiredSize;
 }
 
 //Start fresh with the original drawn string each time, in case frame has gotten larger
@@ -318,6 +326,13 @@ typedef NS_ENUM(NSInteger, RCTSizeComparison)
   }];
 
   [_textStorage endEditing];
+}
+
+- (void)setMinimumFontScale:(CGFloat)minimumFontScale
+{
+  if (minimumFontScale > 0.0) {
+    _minimumFontScale = minimumFontScale;
+  }
 }
 
 #pragma mark - Accessibility
