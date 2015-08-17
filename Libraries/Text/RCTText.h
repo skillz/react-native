@@ -9,6 +9,13 @@
 
 #import <UIKit/UIKit.h>
 
+typedef NS_ENUM(NSInteger, RCTSizeComparison)
+{
+  RCTSizeTooLarge,
+  RCTSizeTooSmall,
+  RCTSizeWithinRange,
+};
+
 @interface RCTText : UIView
 
 @property (nonatomic, assign) UIEdgeInsets contentInset;
