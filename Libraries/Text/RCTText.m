@@ -187,7 +187,7 @@ static CGFloat const RCTTextAutoSizeGranularity                   = 0.01f;
 {
   [self resetDrawnTextStorage];
 
-  BOOL fits = [self checkScale:1.0f
+  BOOL fits = [self attemptScale:1.0f
                       forFrame:frame];
   CGSize requiredSize;
   if (!fits) {
@@ -214,7 +214,7 @@ static CGFloat const RCTTextAutoSizeGranularity                   = 0.01f;
     //Bail because we can't meet error margin.
     return [self calculateSize:_textStorage];
   } else {
-    RCTSizeComparison comparison = [self checkScale:midScale forFrame:frame];
+    RCTSizeComparison comparison = [self attemptScale:midScale forFrame:frame];
     if (comparison == RCTSizeWithinRange) {
       return [self calculateSize:_textStorage];
     } else if (comparison == RCTSizeTooLarge) {
@@ -231,7 +231,7 @@ static CGFloat const RCTTextAutoSizeGranularity                   = 0.01f;
   }
 }
 
-- (RCTSizeComparison)checkScale:(CGFloat)scale
+- (RCTSizeComparison)attemptScale:(CGFloat)scale
                        forFrame:(CGRect)frame
 {
   NSLayoutManager *layoutManager = [_textStorage.layoutManagers firstObject];
