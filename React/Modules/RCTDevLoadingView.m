@@ -129,6 +129,7 @@ RCT_EXPORT_MODULE()
 @implementation RCTDevLoadingView
 
 + (NSString *)moduleName { return nil; }
++ (void)setEnabled:(BOOL)enable {}
 
 @end
 
