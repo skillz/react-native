@@ -368,7 +368,7 @@ class Server {
           });
           res.setHeader('Content-Type', 'application/javascript');
           
-          res.setHeader('ETag', p.calculateETag());
+          res.setHeader('ETag', p.getEtag());
           if (req.headers['if-none-match'] === res.getHeader('ETag')) {
             res.statusCode = 304;
             res.end();
@@ -376,7 +376,6 @@ class Server {
             res.end(bundleSource);
           }
           
-          res.end(bundleSource);
           Activity.endEvent(startReqEventId);
         } else if (requestType === 'map') {
           var sourceMap = JSON.stringify(p.getSourceMap());
@@ -393,7 +392,11 @@ class Server {
       this._handleError.bind(this, res, optionsJson)
     ).done();
   }
+<<<<<<< HEAD
   
+=======
+
+>>>>>>> feature-local-etag-matt-foley
   _handleError(res, bundleID, error) {
     res.writeHead(error.status || 500, {
       'Content-Type': 'application/json; charset=UTF-8',
