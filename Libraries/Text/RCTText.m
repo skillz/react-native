@@ -35,7 +35,7 @@ static CGFloat const RCTTextAutoSizeGranularity                   = 0.01f;
 - (instancetype)initWithFrame:(CGRect)frame
 {
   if ((self = [super initWithFrame:frame])) {
-    _textStorage = [[NSTextStorage alloc] init];
+    _textStorage = [NSTextStorage new];
     _reactSubviews = [NSMutableArray array];
     
     _minimumFontScale = RCTTextAutoSizeDefaultMinimumFontScale;
@@ -142,8 +142,8 @@ static CGFloat const RCTTextAutoSizeGranularity                   = 0.01f;
   NSNumber *reactTag = self.reactTag;
 
   CGFloat fraction;
-  NSLayoutManager *layoutManager = [_textStorage.layoutManagers firstObject];
-  NSTextContainer *textContainer = [layoutManager.textContainers firstObject];
+  NSLayoutManager *layoutManager = _textStorage.layoutManagers.firstObject;
+  NSTextContainer *textContainer = layoutManager.textContainers.firstObject;
   NSUInteger characterIndex = [layoutManager characterIndexForPoint:point
                                                     inTextContainer:textContainer
                            fractionOfDistanceBetweenInsertionPoints:&fraction];
