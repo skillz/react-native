@@ -392,11 +392,7 @@ class Server {
       this._handleError.bind(this, res, optionsJson)
     ).done();
   }
-<<<<<<< HEAD
-  
-=======
 
->>>>>>> feature-local-etag-matt-foley
   _handleError(res, bundleID, error) {
     res.writeHead(error.status || 500, {
       'Content-Type': 'application/json; charset=UTF-8',
