@@ -13,6 +13,7 @@ var path = require('path');
 var execFile = require('child_process').execFile;
 var http = require('http');
 var isAbsolutePath = require('absolute-path');
+var ServeStatic = require('serve-static');
 
 var getFlowTypeCheckMiddleware = require('./getFlowTypeCheckMiddleware');
 
@@ -242,6 +243,7 @@ function runServer(
   readyCallback
 ) {
   var app = connect()
+    .use(ServeStatic(options.assetRoots + '/assets', {'fallthrough':true}))
     .use(loadRawBody)
     .use(openStackFrameInEditor)
     .use(getDevToolsLauncher(options))
