@@ -68,6 +68,7 @@
     "regenerator": "0.8.36",
     "sane": "^1.1.2",
     "semver": "^4.3.6",
+    "serve-static": "^1.10.0",
     "source-map": "0.1.31",
     "stacktrace-parser": "frantic/stacktrace-parser#493c5e5638",
     "uglify-js": "2.4.16",
