@@ -14,7 +14,7 @@
 #import "UIView+React.h"
 
 static CGFloat const RCTTextAutoSizeDefaultMinimumFontScale       = 0.5f;
-static CGFloat const RCTTextAutoSizeGranularity                   = 0.00025f;
+static CGFloat const RCTTextAutoSizeGranularity                   = 0.02f;
 
 @interface RCTText ()
 
