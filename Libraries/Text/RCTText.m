@@ -14,8 +14,6 @@
 #import "UIView+React.h"
 
 static CGFloat const RCTTextAutoSizeDefaultMinimumFontScale       = 0.5f;
-static CGFloat const RCTTextAutoSizeWidthErrorMargin              = 0.001f;
-static CGFloat const RCTTextAutoSizeHeightErrorMargin             = 0.15f;
 static CGFloat const RCTTextAutoSizeGranularity                   = 0.00025f;
 
 @interface RCTText ()
@@ -186,97 +184,49 @@ static CGFloat const RCTTextAutoSizeGranularity                   = 0.00025f;
 
 - (CGRect)updateToFitFrame:(CGRect)frame
 {
+  NSLayoutManager *layoutManager = [_textStorage.layoutManagers firstObject];
+  NSTextContainer *textContainer = [layoutManager.textContainers firstObject];
+  [textContainer setLineBreakMode:NSLineBreakByWordWrapping];
+
+  NSRange glyphRange = NSMakeRange(0, _textStorage.length);
+
   [self resetDrawnTextStorage];
 
-  BOOL fits = [self attemptScale:1.0f
-                      forFrame:frame];
-  CGSize requiredSize;
-  if (!fits) {
-    requiredSize = [self calculateOptimumScaleInFrame:frame
-                                             minScale:self.minimumFontScale
-                                             maxScale:1.0
-                                              prevMid:INT_MAX];
-  } else {
+  CGSize requiredSize = [self calculateSize:_textStorage];
+  NSInteger linesRequired = [self numberOfLinesRequired:layoutManager];
+
+  CGFloat currentScale = 1.0;;
+
+  while ((requiredSize.width > CGRectGetWidth(frame) ||
+          (linesRequired > textContainer.maximumNumberOfLines &&
+           textContainer.maximumNumberOfLines != 0))
+         && currentScale >= self.minimumFontScale)
+  {
+    currentScale -= RCTTextAutoSizeGranularity;
+    [_textStorage beginEditing];
+    [_textStorage enumerateAttribute:NSFontAttributeName
+                             inRange:glyphRange
+                             options:0
+                          usingBlock:^(UIFont *font, NSRange range, BOOL *stop)
+     {
+       if (font) {
+         UIFont *originalFont = [_originalString attribute:NSFontAttributeName
+                                                   atIndex:range.location
+                                            effectiveRange:&range];
+         UIFont *newFont = [font fontWithSize:originalFont.pointSize * currentScale];
+         [_textStorage removeAttribute:NSFontAttributeName range:range];
+         [_textStorage addAttribute:NSFontAttributeName value:newFont range:range];
+       }
+     }];
+    [_textStorage endEditing];
+
+    linesRequired = [self numberOfLinesRequired:layoutManager];
     requiredSize = [self calculateSize:_textStorage];
   }
 
   //Vertically center draw position
-  frame.origin.y = _contentInset.top + RCTRoundPixelValue((CGRectGetHeight(frame) - requiredSize.height) / 2.0f);
+  frame.origin.y = _contentInset.top + RCTRoundPixelValue((CGRectGetHeight(frame) - requiredSize.height) / 2);
   return frame;
-}
-
-- (CGSize)calculateOptimumScaleInFrame:(CGRect)frame
-                              minScale:(CGFloat)minScale
-                              maxScale:(CGFloat)maxScale
-                               prevMid:(CGFloat)prevMid
-{
-  CGFloat midScale = (minScale + maxScale) / 2.0f;
-  if (round((prevMid / RCTTextAutoSizeGranularity)) == round((midScale / RCTTextAutoSizeGranularity))) {
-    //Bail because we can't meet error margin.
-    return [self calculateSize:_textStorage];
-  } else {
-    RCTSizeComparison comparison = [self attemptScale:midScale forFrame:frame];
-    if (comparison == RCTSizeWithinRange) {
-      return [self calculateSize:_textStorage];
-    } else if (comparison == RCTSizeTooLarge) {
-      return [self calculateOptimumScaleInFrame:frame
-                                       minScale:minScale
-                                       maxScale:midScale - RCTTextAutoSizeGranularity
-                                        prevMid:midScale];
-    } else {
-      return [self calculateOptimumScaleInFrame:frame
-                                       minScale:midScale + RCTTextAutoSizeGranularity
-                                       maxScale:maxScale
-                                        prevMid:midScale];
-    }
-  }
-}
-
-- (RCTSizeComparison)attemptScale:(CGFloat)scale
-                       forFrame:(CGRect)frame
-{
-  NSLayoutManager *layoutManager = [_textStorage.layoutManagers firstObject];
-  NSTextContainer *textContainer = [layoutManager.textContainers firstObject];
-
-  NSRange glyphRange = NSMakeRange(0, _textStorage.length);
-  [_textStorage beginEditing];
-  [_textStorage enumerateAttribute:NSFontAttributeName
-                           inRange:glyphRange
-                           options:0
-                        usingBlock:^(UIFont *font, NSRange range, BOOL *stop)
-   {
-     if (font) {
-       UIFont *originalFont = [_originalString attribute:NSFontAttributeName
-                                                 atIndex:range.location
-                                          effectiveRange:&range];
-       UIFont *newFont = [font fontWithSize:originalFont.pointSize * scale];
-       [_textStorage removeAttribute:NSFontAttributeName range:range];
-       [_textStorage addAttribute:NSFontAttributeName value:newFont range:range];
-     }
-   }];
-
-  [_textStorage endEditing];
-
-  NSInteger linesRequired = [self numberOfLinesRequired:[_textStorage.layoutManagers firstObject]];
-  CGSize requiredSize = [self calculateSize:_textStorage];
-
-  BOOL fitSize = requiredSize.height <= CGRectGetHeight(frame) &&
-                 requiredSize.width <= CGRectGetWidth(frame);
-
-  BOOL fitLines = linesRequired <= textContainer.maximumNumberOfLines ||
-                                   textContainer.maximumNumberOfLines == 0;
-
-  if (fitLines && fitSize) {
-    if ((requiredSize.height + (CGRectGetHeight(frame) * RCTTextAutoSizeHeightErrorMargin)) > CGRectGetHeight(frame) &&
-        (requiredSize.width + (CGRectGetWidth(frame) * RCTTextAutoSizeWidthErrorMargin)) > CGRectGetWidth(frame))
-    {
-      return RCTSizeWithinRange;
-    } else {
-      return RCTSizeTooSmall;
-    }
-  } else {
-    return RCTSizeTooLarge;
-  }
 }
 
 // Via Apple Text Layout Programming Guide
@@ -322,9 +272,9 @@ static CGFloat const RCTTextAutoSizeGranularity                   = 0.00025f;
   [_originalString enumerateAttributesInRange:originalRange
                                       options:0
                                    usingBlock:^(NSDictionary *attrs, NSRange range, BOOL *stop)
-  {
-    [_textStorage setAttributes:attrs range:range];
-  }];
+   {
+     [_textStorage setAttributes:attrs range:range];
+   }];
 
   [_textStorage endEditing];
 }
