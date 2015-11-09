@@ -11,6 +11,6 @@
 
 @interface RCTDevLoadingView : NSObject <RCTBridgeModule>
 
-+ (void)setEnabled:(BOOL)enable;
++ (void)setEnabled:(BOOL)enabled;
 
 @end
