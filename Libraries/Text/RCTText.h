@@ -9,17 +9,12 @@
 
 #import <UIKit/UIKit.h>
 
-typedef NS_ENUM(NSInteger, RCTSizeComparison)
-{
-  RCTSizeTooLarge,
-  RCTSizeTooSmall,
-  RCTSizeWithinRange,
-};
-
 @interface RCTText : UIView
 
 @property (nonatomic, assign) UIEdgeInsets contentInset;
 @property (nonatomic, strong) NSTextStorage *textStorage;
+@property (nonatomic, assign) CGRect textFrame;
+
 
 @property (nonatomic, assign) BOOL adjustsFontSizeToFit;
 @property (nonatomic, assign) CGFloat minimumFontScale;

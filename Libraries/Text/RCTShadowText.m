@@ -20,8 +20,12 @@
 #import "RCTText.h"
 #import "RCTUtils.h"
 
-NSString *const RCTIsHighlightedAttributeName = @"IsHighlightedAttributeName";
-NSString *const RCTReactTagAttributeName = @"ReactTagAttributeName";
+CGFloat const RCTTextAutoSizeDefaultMinimumFontScale       = 0.5f;
+CGFloat const RCTTextAutoSizeWidthErrorMargin              = 0.05f;
+CGFloat const RCTTextAutoSizeGranularity                   = 0.001f;
+
+NSString *const RCTIsHighlightedAttributeName              = @"IsHighlightedAttributeName";
+NSString *const RCTReactTagAttributeName                   = @"ReactTagAttributeName";
 
 @implementation RCTShadowText
 {
@@ -91,10 +95,10 @@ static css_dim_t RCTMeasure(void *context, float width)
   CGFloat width = self.frame.size.width - (padding.left + padding.right);
   
   NSTextStorage *textStorage = [self buildTextStorageForWidth:width];
+  CGRect textFrame = [self calculateTextFrame:textStorage];
   [applierBlocks addObject:^(RCTSparseArray *viewRegistry) {
     RCTText *view = viewRegistry[self.reactTag];
-    view.adjustsFontSizeToFit = self.adjustsFontSizeToFit;
-    view.minimumFontScale = self.minimumFontScale;
+    view.textFrame = textFrame;
     view.textStorage = textStorage;
   }];
 
@@ -326,6 +330,154 @@ static css_dim_t RCTMeasure(void *context, float width)
   }
 }
 
+#pragma mark Autosizing
+
+- (CGRect)calculateTextFrame:(NSTextStorage *)textStorage
+{
+  CGRect textFrame = UIEdgeInsetsInsetRect((CGRect){CGPointZero, self.frame.size},
+                                           self.paddingAsInsets);
+
+  if (_adjustsFontSizeToFit) {
+    textFrame = [self updateStorage:textStorage toFitFrame:textFrame];
+  }
+
+  return textFrame;
+}
+
+- (CGRect)updateStorage:(NSTextStorage *)textStorage toFitFrame:(CGRect)frame
+{
+
+  BOOL fits = [self attemptScale:1.0f
+                       inStorage:textStorage
+                        forFrame:frame];
+  CGSize requiredSize;
+  if (!fits) {
+    requiredSize = [self calculateOptimumScaleInFrame:frame
+                                           forStorage:textStorage
+                                             minScale:self.minimumFontScale
+                                             maxScale:1.0
+                                              prevMid:INT_MAX];
+  } else {
+    requiredSize = [self calculateSize:textStorage];
+  }
+
+  //Vertically center draw position
+  frame.origin.y = self.paddingAsInsets.top + RCTRoundPixelValue((CGRectGetHeight(frame) - requiredSize.height) / 2.0f);
+  return frame;
+}
+
+- (CGSize)calculateOptimumScaleInFrame:(CGRect)frame
+                            forStorage:(NSTextStorage *)textStorage
+                              minScale:(CGFloat)minScale
+                              maxScale:(CGFloat)maxScale
+                               prevMid:(CGFloat)prevMid
+{
+  CGFloat midScale = (minScale + maxScale) / 2.0f;
+  if (round((prevMid / RCTTextAutoSizeGranularity)) == round((midScale / RCTTextAutoSizeGranularity))) {
+    //Bail because we can't meet error margin.
+    return [self calculateSize:textStorage];
+  } else {
+    RCTSizeComparison comparison = [self attemptScale:midScale
+                                            inStorage:textStorage
+                                             forFrame:frame];
+    if (comparison == RCTSizeWithinRange) {
+      return [self calculateSize:textStorage];
+    } else if (comparison == RCTSizeTooLarge) {
+      return [self calculateOptimumScaleInFrame:frame
+                                     forStorage:textStorage
+                                       minScale:minScale
+                                       maxScale:midScale - RCTTextAutoSizeGranularity
+                                        prevMid:midScale];
+    } else {
+      return [self calculateOptimumScaleInFrame:frame
+                                     forStorage:textStorage
+                                       minScale:midScale + RCTTextAutoSizeGranularity
+                                       maxScale:maxScale
+                                        prevMid:midScale];
+    }
+  }
+}
+
+- (RCTSizeComparison)attemptScale:(CGFloat)scale
+                        inStorage:(NSTextStorage *)textStorage
+                         forFrame:(CGRect)frame
+{
+  NSLayoutManager *layoutManager = [textStorage.layoutManagers firstObject];
+  NSTextContainer *textContainer = [layoutManager.textContainers firstObject];
+
+  NSRange glyphRange = NSMakeRange(0, textStorage.length);
+  [textStorage beginEditing];
+  [textStorage enumerateAttribute:NSFontAttributeName
+                           inRange:glyphRange
+                           options:0
+                        usingBlock:^(UIFont *font, NSRange range, BOOL *stop)
+   {
+     if (font) {
+       UIFont *originalFont = [self.attributedString attribute:NSFontAttributeName
+                                                       atIndex:range.location
+                                                effectiveRange:&range];
+       UIFont *newFont = [font fontWithSize:originalFont.pointSize * scale];
+       [textStorage removeAttribute:NSFontAttributeName range:range];
+       [textStorage addAttribute:NSFontAttributeName value:newFont range:range];
+     }
+   }];
+
+  [textStorage endEditing];
+
+  NSInteger linesRequired = [self numberOfLinesRequired:[textStorage.layoutManagers firstObject]];
+  CGSize requiredSize = [self calculateSize:textStorage];
+
+  BOOL fitSize = requiredSize.height <= CGRectGetHeight(frame) &&
+  requiredSize.width <= CGRectGetWidth(frame);
+
+  BOOL fitLines = linesRequired <= textContainer.maximumNumberOfLines ||
+  textContainer.maximumNumberOfLines == 0;
+
+  if (fitLines && fitSize) {
+    if ((requiredSize.width + (CGRectGetWidth(frame) * RCTTextAutoSizeWidthErrorMargin)) > CGRectGetWidth(frame))
+    {
+      return RCTSizeWithinRange;
+    } else {
+      return RCTSizeTooSmall;
+    }
+  } else {
+    return RCTSizeTooLarge;
+  }
+}
+
+// Via Apple Text Layout Programming Guide
+// https://developer.apple.com/library/mac/documentation/Cocoa/Conceptual/TextLayout/Tasks/CountLines.html
+- (NSInteger)numberOfLinesRequired:(NSLayoutManager *)layoutManager
+{
+  NSInteger numberOfLines, index, numberOfGlyphs = [layoutManager numberOfGlyphs];
+  NSRange lineRange;
+  for (numberOfLines = 0, index = 0; index < numberOfGlyphs; numberOfLines++){
+    (void) [layoutManager lineFragmentRectForGlyphAtIndex:index
+                                           effectiveRange:&lineRange];
+    index = NSMaxRange(lineRange);
+  }
+
+  return numberOfLines;
+}
+
+// Via Apple Text Layout Programming Guide
+//https://developer.apple.com/library/mac/documentation/Cocoa/Conceptual/TextLayout/Tasks/StringHeight.html
+- (CGSize)calculateSize:(NSTextStorage *)storage
+{
+  NSLayoutManager *layoutManager = [storage.layoutManagers firstObject];
+  NSTextContainer *textContainer = [layoutManager.textContainers firstObject];
+
+  [textContainer setLineBreakMode:NSLineBreakByWordWrapping];
+  NSInteger maxLines = [textContainer maximumNumberOfLines];
+  [textContainer setMaximumNumberOfLines:0];
+  (void) [layoutManager glyphRangeForTextContainer:textContainer];
+  CGSize requiredSize = [layoutManager usedRectForTextContainer:textContainer].size;
+  [textContainer setMaximumNumberOfLines:maxLines];
+
+  return requiredSize;
+}
+
+
 - (void)fillCSSNode:(css_node_t *)node
 {
   [super fillCSSNode:node];
@@ -367,7 +519,6 @@ RCT_TEXT_PROPERTY(FontStyle, _fontStyle, NSString *)
 RCT_TEXT_PROPERTY(IsHighlighted, _isHighlighted, BOOL)
 RCT_TEXT_PROPERTY(LetterSpacing, _letterSpacing, CGFloat)
 RCT_TEXT_PROPERTY(LineHeight, _lineHeight, CGFloat)
-RCT_TEXT_PROPERTY(MinimumFontScale, _minimumFontScale, CGFloat)
 RCT_TEXT_PROPERTY(NumberOfLines, _numberOfLines, NSUInteger)
 RCT_TEXT_PROPERTY(ShadowOffset, _shadowOffset, CGSize)
 RCT_TEXT_PROPERTY(TextAlign, _textAlign, NSTextAlignment)
@@ -395,6 +546,14 @@ RCT_TEXT_PROPERTY(Opacity, _opacity, CGFloat)
     if ([child isKindOfClass:[RCTShadowText class]]) {
       ((RCTShadowText *)child).fontSizeMultiplier = fontSizeMultiplier;
     }
+  }
+  [self dirtyText];
+}
+
+- (void)setMinimumFontScale:(CGFloat)minimumFontScale
+{
+  if (minimumFontScale >= 0.01) {
+    _minimumFontScale = minimumFontScale;
   }
   [self dirtyText];
 }

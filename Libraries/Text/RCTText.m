@@ -13,16 +13,6 @@
 #import "RCTUtils.h"
 #import "UIView+React.h"
 
-static CGFloat const RCTTextAutoSizeDefaultMinimumFontScale       = 0.5f;
-static CGFloat const RCTTextAutoSizeGranularity                   = 0.02f;
-
-@interface RCTText ()
-
-@property (nonatomic, strong) NSAttributedString *originalString;
-@property (nonatomic, assign) CGRect textFrame;
-
-@end
-
 @implementation RCTText
 {
   NSTextStorage *_textStorage;
@@ -35,10 +25,7 @@ static CGFloat const RCTTextAutoSizeGranularity                   = 0.02f;
   if ((self = [super initWithFrame:frame])) {
     _textStorage = [NSTextStorage new];
     _reactSubviews = [NSMutableArray array];
-    
-    _minimumFontScale = RCTTextAutoSizeDefaultMinimumFontScale;
-    _adjustsFontSizeToFit = NO;
-    
+
     self.isAccessibilityElement = YES;
     self.accessibilityTraits |= UIAccessibilityTraitStaticText;
 
@@ -78,21 +65,6 @@ static CGFloat const RCTTextAutoSizeGranularity                   = 0.02f;
 - (NSArray<UIView *> *)reactSubviews
 {
   return _reactSubviews;
-}
-
-- (void)setTextStorage:(NSTextStorage *)textStorage
-{
-  _textStorage = textStorage;
-  //This produces an NSMutableAttributedString and not an NSTextStorage
-  //(Perhaps resolve by doing this on purpose instead of via this mutableCopy side effect?)
-  _originalString = [textStorage mutableCopy];
-  [self calculateTextFrame];
-}
-
-- (void)setFrame:(CGRect)frame
-{
-  [super setFrame:frame];
-  [self calculateTextFrame];
 }
 
 - (void)drawRect:(CGRect)rect
@@ -154,7 +126,6 @@ static CGFloat const RCTTextAutoSizeGranularity                   = 0.02f;
   return reactTag;
 }
 
-
 - (void)didMoveToWindow
 {
   [super didMoveToWindow];
@@ -167,122 +138,6 @@ static CGFloat const RCTTextAutoSizeGranularity                   = 0.02f;
     }
   } else if (_textStorage.length) {
     [self setNeedsDisplay];
-  }
-}
-
-#pragma mark Autosizing
-
-- (void)calculateTextFrame
-{
-  self.textFrame = UIEdgeInsetsInsetRect(self.bounds, _contentInset);
-  if (_adjustsFontSizeToFit) {
-    self.textFrame = [self updateToFitFrame:self.textFrame];
-  }
-
-  [self setNeedsDisplay];
-}
-
-- (CGRect)updateToFitFrame:(CGRect)frame
-{
-  NSLayoutManager *layoutManager = [_textStorage.layoutManagers firstObject];
-  NSTextContainer *textContainer = [layoutManager.textContainers firstObject];
-  [textContainer setLineBreakMode:NSLineBreakByWordWrapping];
-
-  NSRange glyphRange = NSMakeRange(0, _textStorage.length);
-
-  [self resetDrawnTextStorage];
-
-  CGSize requiredSize = [self calculateSize:_textStorage];
-  NSInteger linesRequired = [self numberOfLinesRequired:layoutManager];
-
-  CGFloat currentScale = 1.0;;
-
-  while ((requiredSize.width > CGRectGetWidth(frame) ||
-          (linesRequired > textContainer.maximumNumberOfLines &&
-           textContainer.maximumNumberOfLines != 0))
-         && currentScale >= self.minimumFontScale)
-  {
-    currentScale -= RCTTextAutoSizeGranularity;
-    [_textStorage beginEditing];
-    [_textStorage enumerateAttribute:NSFontAttributeName
-                             inRange:glyphRange
-                             options:0
-                          usingBlock:^(UIFont *font, NSRange range, BOOL *stop)
-     {
-       if (font) {
-         UIFont *originalFont = [_originalString attribute:NSFontAttributeName
-                                                   atIndex:range.location
-                                            effectiveRange:&range];
-         UIFont *newFont = [font fontWithSize:originalFont.pointSize * currentScale];
-         [_textStorage removeAttribute:NSFontAttributeName range:range];
-         [_textStorage addAttribute:NSFontAttributeName value:newFont range:range];
-       }
-     }];
-    [_textStorage endEditing];
-
-    linesRequired = [self numberOfLinesRequired:layoutManager];
-    requiredSize = [self calculateSize:_textStorage];
-  }
-
-  //Vertically center draw position
-  frame.origin.y = _contentInset.top + RCTRoundPixelValue((CGRectGetHeight(frame) - requiredSize.height) / 2);
-  return frame;
-}
-
-// Via Apple Text Layout Programming Guide
-// https://developer.apple.com/library/mac/documentation/Cocoa/Conceptual/TextLayout/Tasks/CountLines.html
-- (NSInteger)numberOfLinesRequired:(NSLayoutManager *)layoutManager
-{
-  NSInteger numberOfLines, index, numberOfGlyphs = [layoutManager numberOfGlyphs];
-  NSRange lineRange;
-  for (numberOfLines = 0, index = 0; index < numberOfGlyphs; numberOfLines++){
-    (void) [layoutManager lineFragmentRectForGlyphAtIndex:index
-                                           effectiveRange:&lineRange];
-    index = NSMaxRange(lineRange);
-  }
-
-  return numberOfLines;
-}
-
-// Via Apple Text Layout Programming Guide
-//https://developer.apple.com/library/mac/documentation/Cocoa/Conceptual/TextLayout/Tasks/StringHeight.html
-- (CGSize)calculateSize:(NSTextStorage *)storage
-{
-  NSLayoutManager *layoutManager = [storage.layoutManagers firstObject];
-  NSTextContainer *textContainer = [layoutManager.textContainers firstObject];
-
-  [textContainer setLineBreakMode:NSLineBreakByWordWrapping];
-  NSInteger maxLines = [textContainer maximumNumberOfLines];
-  [textContainer setMaximumNumberOfLines:0];
-  (void) [layoutManager glyphRangeForTextContainer:textContainer];
-  CGSize requiredSize = [layoutManager usedRectForTextContainer:textContainer].size;
-  [textContainer setMaximumNumberOfLines:maxLines];
-
-  return requiredSize;
-}
-
-//Start fresh with the original drawn string each time, in case frame has gotten larger
-- (void)resetDrawnTextStorage
-{
-  [_textStorage beginEditing];
-
-  NSRange originalRange = NSMakeRange(0, _originalString.length);
-  [_textStorage setAttributes:@{} range:originalRange];
-
-  [_originalString enumerateAttributesInRange:originalRange
-                                      options:0
-                                   usingBlock:^(NSDictionary *attrs, NSRange range, BOOL *stop)
-   {
-     [_textStorage setAttributes:attrs range:range];
-   }];
-
-  [_textStorage endEditing];
-}
-
-- (void)setMinimumFontScale:(CGFloat)minimumFontScale
-{
-  if (minimumFontScale > 0.0) {
-    _minimumFontScale = minimumFontScale;
   }
 }
 

@@ -10,6 +10,14 @@
 #import "RCTShadowView.h"
 #import "RCTTextDecorationLineType.h"
 
+typedef NS_ENUM(NSInteger, RCTSizeComparison)
+{
+  RCTSizeTooLarge,
+  RCTSizeTooSmall,
+  RCTSizeWithinRange,
+};
+
+
 extern NSString *const RCTIsHighlightedAttributeName;
 extern NSString *const RCTReactTagAttributeName;
 
