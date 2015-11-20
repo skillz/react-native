@@ -19,10 +19,9 @@ var React = require('react-native');
 var {
   AppRegistry,
   Settings,
+  SnapshotViewIOS,
   StyleSheet,
 } = React;
-
-var { TestModule } = React.addons;
 
 import type { NavigationContext } from 'NavigationContext';
 
@@ -60,7 +59,8 @@ var APIS = [
   require('./ActionSheetIOSExample'),
   require('./AdSupportIOSExample'),
   require('./AlertIOSExample'),
-  require('./AnimationExample/AnExApp'),
+  require('./AnimatedExample'),
+  require('./AnimatedGratuitousApp/AnExApp'),
   require('./AppStateIOSExample'),
   require('./AsyncStorageExample'),
   require('./BorderExample'),
@@ -82,17 +82,13 @@ var APIS = [
 COMPONENTS.concat(APIS).forEach((Example) => {
   if (Example.displayName) {
     var Snapshotter = React.createClass({
-      componentDidMount: function() {
-        // View is still blank after first RAF :\
-        global.requestAnimationFrame(() =>
-          global.requestAnimationFrame(() => TestModule.verifySnapshot(
-            TestModule.markTestPassed
-          )
-        ));
-      },
       render: function() {
         var Renderable = UIExplorerListBase.makeRenderable(Example);
-        return <Renderable />;
+        return (
+          <SnapshotViewIOS>
+            <Renderable />
+          </SnapshotViewIOS>
+        );
       },
     });
     AppRegistry.registerComponent(Example.displayName, () => Snapshotter);

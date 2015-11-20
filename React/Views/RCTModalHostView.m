@@ -19,7 +19,7 @@
 @implementation RCTModalHostView
 {
   RCTBridge *_bridge;
-  BOOL _hasModalView;
+  BOOL _isPresented;
   RCTModalHostViewController *_modalViewController;
   RCTTouchHandler *_touchHandler;
 }
@@ -33,8 +33,9 @@ RCT_NOT_IMPLEMENTED(- (instancetype)initWithCoder:coder)
     _bridge = bridge;
     _modalViewController = [RCTModalHostViewController new];
     _touchHandler = [[RCTTouchHandler alloc] initWithBridge:bridge];
+    _isPresented = NO;
 
-    __weak RCTModalHostView *weakSelf = self;
+    __weak typeof(self) weakSelf = self;
     _modalViewController.boundsDidChangeBlock = ^(CGRect newBounds) {
       [weakSelf notifyForBoundsChange:newBounds];
     };
@@ -45,28 +46,34 @@ RCT_NOT_IMPLEMENTED(- (instancetype)initWithCoder:coder)
 
 - (void)notifyForBoundsChange:(CGRect)newBounds
 {
-  if (_hasModalView) {
+  if (_modalViewController.view && _isPresented) {
     [_bridge.uiManager setFrame:newBounds forView:_modalViewController.view];
   }
 }
 
 - (NSArray *)reactSubviews
 {
-  return _hasModalView ? @[_modalViewController.view] : @[];
+  return [NSArray arrayWithObjects:_modalViewController.view, nil];
 }
 
 - (void)insertReactSubview:(UIView *)subview atIndex:(__unused NSInteger)atIndex
 {
   [subview addGestureRecognizer:_touchHandler];
   _modalViewController.view = subview;
-  _hasModalView = YES;
 }
 
 - (void)removeReactSubview:(UIView *)subview
 {
   RCTAssert(subview == _modalViewController.view, @"Cannot remove view other than modal view");
   _modalViewController.view = nil;
-  _hasModalView = NO;
+}
+
+- (void)dismissModalViewController
+{
+  if (_isPresented) {
+    [_modalViewController dismissViewControllerAnimated:self.animated completion:nil];
+    _isPresented = NO;
+  }
 }
 
 - (void)didMoveToSuperview
@@ -76,15 +83,16 @@ RCT_NOT_IMPLEMENTED(- (instancetype)initWithCoder:coder)
   if (self.superview) {
     RCTAssert(self.reactViewController, @"Can't present modal view controller without a presenting view controller");
     [self.reactViewController presentViewController:_modalViewController animated:self.animated completion:nil];
+    _isPresented = YES;
   } else {
-    [_modalViewController dismissViewControllerAnimated:self.animated completion:nil];
+    [self dismissModalViewController];
   }
 }
 
 - (void)invalidate
 {
   dispatch_async(dispatch_get_main_queue(), ^{
-    [_modalViewController dismissViewControllerAnimated:self.animated completion:nil];
+    [self dismissModalViewController];
   });
 }
 

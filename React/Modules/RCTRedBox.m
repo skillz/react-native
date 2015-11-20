@@ -17,7 +17,6 @@
 #if RCT_DEBUG
 
 @interface RCTRedBoxWindow : UIWindow <UITableViewDelegate, UITableViewDataSource>
-
 @end
 
 @implementation RCTRedBoxWindow
@@ -77,13 +76,6 @@
     reloadButton.frame = CGRectMake(buttonWidth, self.bounds.size.height - buttonHeight, buttonWidth, buttonHeight);
     [rootView addSubview:dismissButton];
     [rootView addSubview:reloadButton];
-
-    NSNotificationCenter *notificationCenter = [NSNotificationCenter defaultCenter];
-
-    [notificationCenter addObserver:self
-                           selector:@selector(dismiss)
-                               name:RCTReloadNotification
-                             object:nil];
   }
   return self;
 }
@@ -134,7 +126,7 @@ RCT_NOT_IMPLEMENTED(- (instancetype)initWithCoder:(NSCoder *)aDecoder)
 {
   self.hidden = YES;
   [self resignFirstResponder];
-  [[UIApplication sharedApplication].delegate.window makeKeyWindow];
+  [RCTSharedApplication().delegate.window makeKeyWindow];
 }
 
 - (void)reload
@@ -201,9 +193,8 @@ RCT_NOT_IMPLEMENTED(- (instancetype)initWithCoder:(NSCoder *)aDecoder)
   }
 
   cell.textLabel.text = stackFrame[@"methodName"];
-
-  NSString *fileAndLine = [stackFrame[@"file"] lastPathComponent];
-  cell.detailTextLabel.text = fileAndLine ? [fileAndLine stringByAppendingFormat:@":%@", stackFrame[@"lineNumber"]] : nil;
+  cell.detailTextLabel.text = [NSString stringWithFormat:@"%@ @ %@:%@",
+    [stackFrame[@"file"] lastPathComponent], stackFrame[@"lineNumber"], stackFrame[@"column"]];
   return cell;
 }
 
@@ -261,6 +252,9 @@ RCT_NOT_IMPLEMENTED(- (instancetype)initWithCoder:(NSCoder *)aDecoder)
 
 @end
 
+@interface RCTRedBox () <RCTInvalidating>
+@end
+
 @implementation RCTRedBox
 {
   RCTRedBoxWindow *_window;
@@ -309,7 +303,14 @@ RCT_EXPORT_MODULE()
 
 - (void)dismiss
 {
-  [_window dismiss];
+  dispatch_async(dispatch_get_main_queue(), ^{
+    [_window dismiss];
+  });
+}
+
+- (void)invalidate
+{
+  [self dismiss];
 }
 
 @end

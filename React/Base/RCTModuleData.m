@@ -49,6 +49,11 @@ RCT_NOT_IMPLEMENTED(- (instancetype)init);
 {
   if (!_methods) {
     NSMutableArray *moduleMethods = [NSMutableArray new];
+
+    if ([_instance respondsToSelector:@selector(methodsToExport)]) {
+      [moduleMethods addObjectsFromArray:[_instance methodsToExport]];
+    }
+
     unsigned int methodCount;
     Method *methods = class_copyMethodList(object_getClass(_moduleClass), &methodCount);
 
@@ -58,7 +63,7 @@ RCT_NOT_IMPLEMENTED(- (instancetype)init);
       if ([NSStringFromSelector(selector) hasPrefix:@"__rct_export__"]) {
         IMP imp = method_getImplementation(method);
         NSArray *entries = ((NSArray *(*)(id, SEL))imp)(_moduleClass, selector);
-        RCTModuleMethod *moduleMethod =
+        id<RCTBridgeMethod> moduleMethod =
         [[RCTModuleMethod alloc] initWithObjCMethodName:entries[1]
                                            JSMethodName:entries[0]
                                             moduleClass:_moduleClass];
@@ -76,6 +81,10 @@ RCT_NOT_IMPLEMENTED(- (instancetype)init);
 
 - (NSDictionary *)config
 {
+  if (_constants.count == 0 && self.methods.count == 0) {
+    return nil; // Nothing to export
+  }
+
   NSMutableDictionary *config = [NSMutableDictionary new];
   config[@"moduleID"] = _moduleID;
 
@@ -84,13 +93,21 @@ RCT_NOT_IMPLEMENTED(- (instancetype)init);
   }
 
   NSMutableDictionary *methodconfig = [NSMutableDictionary new];
-  [self.methods enumerateObjectsUsingBlock:^(RCTModuleMethod *method, NSUInteger idx, __unused BOOL *stop) {
-    methodconfig[method.JSMethodName] = @{
-      @"methodID": @(idx),
-      @"type": method.functionType == RCTFunctionTypePromise ? @"remoteAsync" : @"remote",
-    };
+  [self.methods enumerateObjectsUsingBlock:^(id<RCTBridgeMethod> method, NSUInteger idx, __unused BOOL *stop) {
+    if (method.functionType == RCTFunctionTypePromise) {
+      methodconfig[method.JSMethodName] = @{
+        @"methodID": @(idx),
+        @"type": @"remoteAsync",
+      };
+    } else {
+      methodconfig[method.JSMethodName] = @{
+        @"methodID": @(idx),
+      };
+    }
   }];
-  config[@"methods"] = [methodconfig copy];
+  if (methodconfig.count) {
+    config[@"methods"] = [methodconfig copy];
+  }
 
   return [config copy];
 }
