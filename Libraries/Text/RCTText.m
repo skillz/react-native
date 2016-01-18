@@ -26,7 +26,7 @@ static CGFloat const RCTTextAutoSizeGranularity                   = 0.02f;
 @implementation RCTText
 {
   NSTextStorage *_textStorage;
-  NSMutableArray *_reactSubviews;
+  NSMutableArray<UIView *> *_reactSubviews;
   CAShapeLayer *_highlightLayer;
 }
 
@@ -75,7 +75,7 @@ static CGFloat const RCTTextAutoSizeGranularity                   = 0.02f;
   [_reactSubviews removeObject:subview];
 }
 
-- (NSArray *)reactSubviews
+- (NSArray<UIView *> *)reactSubviews
 {
   return _reactSubviews;
 }

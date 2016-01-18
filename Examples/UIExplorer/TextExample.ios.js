@@ -243,6 +243,21 @@ exports.examples = [
           </Text>
           )
         </Text>
+        <Text style={{opacity:0.7}}>
+          (opacity
+            <Text>
+              (is inherited
+                <Text style={{opacity:0.7}}>
+                  (and accumulated
+                    <Text style={{backgroundColor:'#ffaaaa'}}>
+                      (and also applies to the background)
+                    </Text>
+                  )
+                </Text>
+              )
+            </Text>
+          )
+        </Text>
         <Text style={{fontSize: 12}}>
           <Entity>Entity Name</Entity>
         </Text>
@@ -405,6 +420,17 @@ exports.examples = [
       <View>
         <Text>
           This text contains an inline image <Image source={require('./flux.png')}/>. Neat, huh?
+        </Text>
+      </View>
+    );
+  },
+}, {
+  title: 'Text shadow',
+  render: function() {
+    return (
+      <View>
+        <Text style={{fontSize: 20, textShadowOffset: {width: 2, height: 2}, textShadowRadius: 1, textShadowColor: '#00cccc'}}>
+          Demo text shadow
         </Text>
       </View>
     );

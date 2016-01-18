@@ -86,6 +86,8 @@ ReadableMap -> Object
 ReadableArray -> Array
 ```
 
+Read more about [ReadableMap](https://github.com/facebook/react-native/blob/master/ReactAndroid/src/main/java/com/facebook/react/bridge/ReadableMap.java) and [ReadableArray](https://github.com/facebook/react-native/blob/master/ReactAndroid/src/main/java/com/facebook/react/bridge/ReadableArray.java)
+
 ### Register the Module
 
 The last step within Java is to register the Module; this happens in the `createNativeModules` of your apps package. If a module is not registered it will not be available from JavaScript.
@@ -124,32 +126,26 @@ mReactInstanceManager = ReactInstanceManager.builder()
 
 To make it simpler to access your new functionality from JavaScript, it is common to wrap the native module in a JavaScript module. This is not necessary but saves the consumers of your library the need to pull it off of `NativeModules` each time. This JavaScript file also becomes a good location for you to add any JavaScript side functionality.
 
-```java
-/**
- * @providesModule ToastAndroid
- */
-
+```js
 'use strict';
-
 /**
- * This exposes the native ToastAndroid module as a JS module. This has a function 'show'
- * which takes the following parameters:
+ * This exposes the native ToastAndroid module as a JS module. This has a
+ * function 'show' which takes the following parameters:
  *
  * 1. String message: A string with the text to toast
- * 2. int duration: The duration of the toast. May be ToastAndroid.SHORT or ToastAndroid.LONG
+ * 2. int duration: The duration of the toast. May be ToastAndroid.SHORT or
+ *    ToastAndroid.LONG
  */
 var { NativeModules } = require('react-native');
 module.exports = NativeModules.ToastAndroid;
 ```
 
-Now, from your JavaScript file you can call the method like this:
+Now, from your other JavaScript file you can call the method like this:
 
 ```js
-var ToastAndroid = require('ToastAndroid')
-ToastAndroid.show('Awesome', ToastAndroid.SHORT);
+var ToastAndroid = require('./ToastAndroid');
 
-// Note: We require ToastAndroid without any relative filepath because
-// of the @providesModule directive. Using @providesModule is optional.
+ToastAndroid.show('Awesome', ToastAndroid.SHORT);
 ```
 
 ## Beyond Toasts
@@ -203,6 +199,62 @@ A native module is supposed to invoke its callback only once. It can, however, s
 
 It is very important to highlight that the callback is not invoked immediately after the native function completes - remember that bridge communication is asynchronous, and this too is tied to the run loop.
 
+### Promises
+
+Native modules can also fulfill a promise, which can simplify your code, especially when using ES2016's `async/await` syntax. When the last parameter of a bridged native method is a `Promise`, its corresponding JS method will return a JS Promise object.
+
+Refactoring the above code to use a promise instead of callbacks looks like this:
+
+```java
+public class UIManagerModule extends ReactContextBaseJavaModule {
+
+...
+
+  @ReactMethod
+  public void measureLayout(
+      int tag,
+      int ancestorTag,
+      Promise promise) {
+    try {
+      measureLayout(tag, ancestorTag, mMeasureBuffer);
+
+      WritableMap map = Arguments.createMap();
+
+      map.putDouble("relativeX", PixelUtil.toDIPFromPixel(mMeasureBuffer[0]));
+      map.putDouble("relativeY", PixelUtil.toDIPFromPixel(mMeasureBuffer[1]));
+      map.putDouble("width", PixelUtil.toDIPFromPixel(mMeasureBuffer[2]));
+      map.putDouble("height", PixelUtil.toDIPFromPixel(mMeasureBuffer[3]));
+
+      promise.resolve(map);
+    } catch (IllegalViewOperationException e) {
+      promise.reject(e.getMessage());
+    }
+  }
+
+...
+```
+
+The JavaScript counterpart of this method returns a Promise. This means you can use the `await` keyword within an async function to call it and wait for its result:
+
+```js
+async function measureLayout() {
+  try {
+    var {
+      relativeX,
+      relativeY,
+      width,
+      height,
+    } = await UIManager.measureLayout(100, 100);
+
+    console.log(relativeX + ':' + relativeY + ':' + width + ':' + height);
+  } catch (e) {
+    console.error(e);
+  }
+}
+
+measureLayout();
+```
+
 ### Threading
 
 Native modules should not have any assumptions about what thread they are being called on, as the current assignment is subject to change in the future. If a blocking call is required, the heavy work should be dispatched to an internally managed worker thread, and any callbacks distributed from there.
@@ -229,7 +281,7 @@ sendEvent(reactContext, "keyboardWillShow", params);
 JavaScript modules can then register to receive events by `addListenerOn` using the `Subscribable` mixin
 
 ```js
-var RCTDeviceEventEmitter = require('RCTDeviceEventEmitter');
+var { DeviceEventEmitter } = require('react-native');
 ...
 
 var ScrollResponderMixin = {
@@ -238,7 +290,7 @@ var ScrollResponderMixin = {
 
   componentWillMount: function() {
     ...
-    this.addListenerOn(RCTDeviceEventEmitter,
+    this.addListenerOn(DeviceEventEmitter,
                        'keyboardWillShow',
                        this.scrollResponderKeyboardWillShow);
     ...
@@ -247,4 +299,16 @@ var ScrollResponderMixin = {
     this.keyboardWillOpenTo = e;
     this.props.onKeyboardWillShow && this.props.onKeyboardWillShow(e);
   },
+```
+
+You can also directly use the `DeviceEventEmitter` module to listen for events.
+
+```js
+...
+componentWillMount: function() {
+  DeviceEventEmitter.addListener('keyboardWillShow', function(e: Event) {
+    // handle event.
+  });
+}
+...
 ```

@@ -40,7 +40,7 @@ class UIExplorerListBase extends React.Component {
         components: [],
         apis: [],
       }),
-      searchText: this.props.searchText,
+      searchText: this.props.searchText || '',
     };
   }
 
@@ -116,7 +116,7 @@ class UIExplorerListBase extends React.Component {
   search(text: mixed): void {
     this.props.search && this.props.search(text);
 
-    var regex = new RegExp(text, 'i');
+    var regex = new RegExp(String(text), 'i');
     var filter = (component) => regex.test(component.title);
 
     this.setState({

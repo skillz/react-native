@@ -10,7 +10,8 @@
 
 const Activity = require('../Activity');
 const AssetServer = require('../AssetServer');
-const FileWatcher = require('../FileWatcher');
+const FileWatcher = require('../DependencyResolver/FileWatcher');
+const getPlatformExtension = require('../DependencyResolver/lib/getPlatformExtension');
 const Bundler = require('../Bundler');
 const Promise = require('promise');
 
@@ -51,6 +52,10 @@ const validateOpts = declareOpts({
     type: 'boolean',
     default: false,
   },
+  enableInternalTransforms: {
+    type: 'boolean',
+    default: false,
+  },
   assetRoots: {
     type: 'array',
     required: false,
@@ -63,6 +68,10 @@ const validateOpts = declareOpts({
     type: 'number',
     required: false,
   },
+  getTransformOptionsModulePath: {
+    type: 'string',
+    required: false,
+  }
 });
 
 const bundleOpts = declareOpts({
@@ -93,7 +102,22 @@ const bundleOpts = declareOpts({
   platform: {
     type: 'string',
     required: true,
-  }
+  },
+  runBeforeMainModule: {
+    type: 'array',
+    default: [
+      // Ensures essential globals are available and are patched correctly.
+      'InitializeJavaScriptAppEngine'
+    ],
+  },
+  unbundle: {
+    type: 'boolean',
+    default: false,
+  },
+  hot: {
+    type: 'boolean',
+    default: false,
+  },
 });
 
 const dependencyOpts = declareOpts({
@@ -118,6 +142,7 @@ class Server {
     this._projectRoots = opts.projectRoots;
     this._bundles = Object.create(null);
     this._changeWatchers = [];
+    this._fileChangeListeners = [];
 
     const assetGlobs = opts.assetExts.map(ext => '**/*.' + ext);
 
@@ -159,6 +184,14 @@ class Server {
     this._fileWatcher.on('all', this._onFileChange.bind(this));
 
     this._debouncedFileChangeHandler = _.debounce(filePath => {
+      // if Hot Loading is enabled avoid rebuilding bundles and sending live
+      // updates. Instead, send the HMR updates right away and once that
+      // finishes, invoke any other file change listener.
+      if (this._hmrFileChangeListener) {
+        this._hmrFileChangeListener(filePath);
+        return;
+      }
+
       this._rebuildBundles(filePath);
       this._informChangeWatchers();
     }, 50);
@@ -171,16 +204,29 @@ class Server {
     ]);
   }
 
+  setHMRFileChangeListener(listener) {
+    this._hmrFileChangeListener = listener;
+  }
+
   buildBundle(options) {
     return Promise.resolve().then(() => {
+      if (!options.platform) {
+        options.platform = getPlatformExtension(options.entryFile);
+      }
+
       const opts = bundleOpts(options);
-      return this._bundler.bundle(
-        opts.entryFile,
-        opts.runModule,
-        opts.sourceMapUrl,
-        opts.dev,
-        opts.platform
-      );
+      return this._bundler.bundle(opts);
+    });
+  }
+
+  buildPrepackBundle(options) {
+    return Promise.resolve().then(() => {
+      if (!options.platform) {
+        options.platform = getPlatformExtension(options.entryFile);
+      }
+
+      const opts = bundleOpts(options);
+      return this._bundler.prepackBundle(opts);
     });
   }
 
@@ -189,8 +235,24 @@ class Server {
     return this.buildBundle(options);
   }
 
+  buildBundleForHMR(modules) {
+    return this._bundler.bundleForHMR(modules);
+  }
+
+  getShallowDependencies(entryFile) {
+    return this._bundler.getShallowDependencies(entryFile);
+  }
+
+  getModuleForPath(entryFile) {
+    return this._bundler.getModuleForPath(entryFile);
+  }
+
   getDependencies(options) {
     return Promise.resolve().then(() => {
+      if (!options.platform) {
+        options.platform = getPlatformExtension(options.entryFile);
+      }
+
       const opts = dependencyOpts(options);
       return this._bundler.getDependencies(
         opts.entryFile,
@@ -230,6 +292,7 @@ class Server {
           p.getSource({
             inlineSourceMap: options.inlineSourceMap,
             minify: options.minify,
+            dev: options.dev,
           });
           return p;
         });
@@ -356,6 +419,7 @@ class Server {
           var bundleSource = p.getSource({
             inlineSourceMap: options.inlineSourceMap,
             minify: options.minify,
+            dev: options.dev,
           });
           res.setHeader('Content-Type', 'application/javascript');
           
@@ -371,6 +435,7 @@ class Server {
         } else if (requestType === 'map') {
           var sourceMap = p.getSourceMap({
             minify: options.minify,
+            dev: options.dev,
           });
 
           if (typeof sourceMap !== 'string') {
@@ -440,18 +505,23 @@ class Server {
     const sourceMapUrlObj = _.clone(urlObj);
     sourceMapUrlObj.pathname = pathname.replace(/\.bundle$/, '.map');
 
+    // try to get the platform from the url
+    const platform = urlObj.query.platform ||
+      getPlatformExtension(pathname);
+
     return {
       sourceMapUrl: url.format(sourceMapUrlObj),
       entryFile: entryFile,
       dev: this._getBoolOptionFromQuery(urlObj.query, 'dev', true),
       minify: this._getBoolOptionFromQuery(urlObj.query, 'minify'),
+      hot: this._getBoolOptionFromQuery(urlObj.query, 'hot', false),
       runModule: this._getBoolOptionFromQuery(urlObj.query, 'runModule', true),
       inlineSourceMap: this._getBoolOptionFromQuery(
         urlObj.query,
         'inlineSourceMap',
         false
       ),
-      platform: urlObj.query.platform,
+      platform: platform,
     };
   }
 
