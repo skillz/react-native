@@ -75,6 +75,11 @@ var TextEventsExample = React.createClass({
           onSubmitEditing={(event) => this.updateText(
             'onSubmitEditing text: ' + event.nativeEvent.text
           )}
+          onSelectionChange={(event) => this.updateText(
+            'onSelectionChange range: ' +
+              event.nativeEvent.selection.start + ',' +
+              event.nativeEvent.selection.end
+          )}
           onKeyPress={(event) => {
             this.updateText('onKeyPress key: ' + event.nativeEvent.key);
           }}
@@ -120,6 +125,27 @@ class RewriteExample extends React.Component {
   }
 }
 
+class RewriteExampleInvalidCharacters extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = {text: ''};
+  }
+  render() {
+    return (
+      <View style={styles.rewriteContainer}>
+        <TextInput
+          multiline={false}
+          onChangeText={(text) => {
+            this.setState({text: text.replace(/\s/g, '')});
+          }}
+          style={styles.default}
+          value={this.state.text}
+        />
+      </View>
+    );
+  }
+}
+
 class TokenizedTextExample extends React.Component {
   constructor(props) {
     super(props);
@@ -153,7 +179,7 @@ class TokenizedTextExample extends React.Component {
     //highlight hashtags
     parts = parts.map((text) => {
       if (/^#/.test(text)) {
-        return <Text style={styles.hashtag}>{text}</Text>;
+        return <Text key={text} style={styles.hashtag}>{text}</Text>;
       } else {
         return text;
       }
@@ -309,6 +335,12 @@ exports.examples = [
     }
   },
   {
+    title: "Live Re-Write (no spaces allowed)",
+    render: function() {
+      return <RewriteExampleInvalidCharacters />;
+    }
+  },
+  {
     title: 'Auto-capitalize',
     render: function() {
       return (
@@ -378,6 +410,27 @@ exports.examples = [
           <WithLabel key={type} label={type}>
             <TextInput
               keyboardType={type}
+              style={styles.default}
+            />
+          </WithLabel>
+        );
+      });
+      return <View>{examples}</View>;
+    }
+  },
+  {
+    title: 'Keyboard appearance',
+    render: function() {
+      var keyboardAppearance = [
+        'default',
+        'light',
+        'dark',
+      ];
+      var examples = keyboardAppearance.map((type) => {
+        return (
+          <WithLabel key={type} label={type}>
+            <TextInput
+              keyboardAppearance={type}
               style={styles.default}
             />
           </WithLabel>
@@ -519,6 +572,27 @@ exports.examples = [
     }
   },
   {
+    title: 'Blur on submit',
+    render: function(): ReactElement { return <BlurOnSubmitExample />; },
+  },
+  {
+    title: 'Multiline blur on submit',
+    render: function() {
+      return (
+        <View>
+          <TextInput
+            style={styles.multiline}
+            placeholder='blurOnSubmit = true'
+            returnKeyType='next'
+            blurOnSubmit={true}
+            multiline={true}
+            onSubmitEditing={event => alert(event.nativeEvent.text)}
+          />
+        </View>
+      );
+    }
+  },
+  {
     title: 'Multiline',
     render: function() {
       return (
@@ -561,9 +635,5 @@ exports.examples = [
     render: function() {
       return <TokenizedTextExample />;
     }
-  },
-  {
-    title: 'Blur on submit',
-    render: function(): ReactElement { return <BlurOnSubmitExample />; },
   },
 ];

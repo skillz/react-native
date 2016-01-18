@@ -16,7 +16,6 @@
 #import "RCTImageComponent.h"
 #import "RCTLog.h"
 #import "RCTShadowRawText.h"
-#import "RCTSparseArray.h"
 #import "RCTText.h"
 #import "RCTUtils.h"
 
@@ -35,7 +34,7 @@ NSString *const RCTReactTagAttributeName                   = @"ReactTagAttribute
   CGFloat _effectiveLetterSpacing;
 }
 
-static css_dim_t RCTMeasure(void *context, float width)
+static css_dim_t RCTMeasure(void *context, float width, float height)
 {
   RCTShadowText *shadowText = (__bridge RCTShadowText *)context;
   NSTextStorage *textStorage = [shadowText buildTextStorageForWidth:width];
@@ -85,18 +84,18 @@ static css_dim_t RCTMeasure(void *context, float width)
   [self dirtyText];
 }
 
-- (NSDictionary *)processUpdatedProperties:(NSMutableSet<RCTApplierBlock> *)applierBlocks
-                          parentProperties:(NSDictionary *)parentProperties
+- (NSDictionary<NSString *, id> *)processUpdatedProperties:(NSMutableSet<RCTApplierBlock> *)applierBlocks
+                                          parentProperties:(NSDictionary<NSString *, id> *)parentProperties
 {
   parentProperties = [super processUpdatedProperties:applierBlocks
                                     parentProperties:parentProperties];
 
   UIEdgeInsets padding = self.paddingAsInsets;
   CGFloat width = self.frame.size.width - (padding.left + padding.right);
-  
+
   NSTextStorage *textStorage = [self buildTextStorageForWidth:width];
   CGRect textFrame = [self calculateTextFrame:textStorage];
-  [applierBlocks addObject:^(RCTSparseArray *viewRegistry) {
+  [applierBlocks addObject:^(NSDictionary<NSNumber *, RCTText *> *viewRegistry) {
     RCTText *view = viewRegistry[self.reactTag];
     view.textFrame = textFrame;
     view.textStorage = textStorage;
@@ -312,21 +311,30 @@ static css_dim_t RCTMeasure(void *context, float width)
   }
 
   // Text decoration
-  if(_textDecorationLine == RCTTextDecorationLineTypeUnderline ||
-     _textDecorationLine == RCTTextDecorationLineTypeUnderlineStrikethrough) {
+  if (_textDecorationLine == RCTTextDecorationLineTypeUnderline ||
+      _textDecorationLine == RCTTextDecorationLineTypeUnderlineStrikethrough) {
     [self _addAttribute:NSUnderlineStyleAttributeName withValue:@(_textDecorationStyle)
      toAttributedString:attributedString];
   }
-  if(_textDecorationLine == RCTTextDecorationLineTypeStrikethrough ||
-     _textDecorationLine == RCTTextDecorationLineTypeUnderlineStrikethrough){
+  if (_textDecorationLine == RCTTextDecorationLineTypeStrikethrough ||
+      _textDecorationLine == RCTTextDecorationLineTypeUnderlineStrikethrough){
     [self _addAttribute:NSStrikethroughStyleAttributeName withValue:@(_textDecorationStyle)
      toAttributedString:attributedString];
   }
-  if(_textDecorationColor) {
+  if (_textDecorationColor) {
     [self _addAttribute:NSStrikethroughColorAttributeName withValue:_textDecorationColor
      toAttributedString:attributedString];
     [self _addAttribute:NSUnderlineColorAttributeName withValue:_textDecorationColor
      toAttributedString:attributedString];
+  }
+
+  // Text shadow
+  if (!CGSizeEqualToSize(_textShadowOffset, CGSizeZero)) {
+    NSShadow *shadow = [NSShadow new];
+    shadow.shadowOffset = _textShadowOffset;
+    shadow.shadowBlurRadius = _textShadowRadius;
+    shadow.shadowColor = _textShadowColor;
+    [self _addAttribute:NSShadowAttributeName withValue:shadow toAttributedString:attributedString];
   }
 }
 
@@ -527,6 +535,9 @@ RCT_TEXT_PROPERTY(TextDecorationLine, _textDecorationLine, RCTTextDecorationLine
 RCT_TEXT_PROPERTY(TextDecorationStyle, _textDecorationStyle, NSUnderlineStyle)
 RCT_TEXT_PROPERTY(WritingDirection, _writingDirection, NSWritingDirection)
 RCT_TEXT_PROPERTY(Opacity, _opacity, CGFloat)
+RCT_TEXT_PROPERTY(TextShadowOffset, _textShadowOffset, CGSize);
+RCT_TEXT_PROPERTY(TextShadowRadius, _textShadowRadius, CGFloat);
+RCT_TEXT_PROPERTY(TextShadowColor, _textShadowColor, UIColor *);
 
 - (void)setAllowFontScaling:(BOOL)allowFontScaling
 {
