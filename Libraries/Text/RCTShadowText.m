@@ -427,8 +427,10 @@ static css_dim_t RCTMeasure(void *context, float width, float height)
                                                          atIndex:range.location
                                                   effectiveRange:&range];
          UIFont *newFont = [font fontWithSize:originalFont.pointSize * scale];
-         [textStorage removeAttribute:NSFontAttributeName range:range];
-         [textStorage addAttribute:NSFontAttributeName value:newFont range:range];
+         if (newFont) {
+           [textStorage removeAttribute:NSFontAttributeName range:range];
+           [textStorage addAttribute:NSFontAttributeName value:newFont range:range];
+         }
        }
      }];
   }
