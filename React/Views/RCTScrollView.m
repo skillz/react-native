@@ -348,6 +348,7 @@ RCT_NOT_IMPLEMENTED(- (instancetype)init)
     NSUInteger subviewCount = [self contentView].reactSubviews.count;
     if (idx >= subviewCount) {
       RCTLogWarn(@"Sticky header index %zd was outside the range {0, %zd}", idx, subviewCount);
+      *stop = YES;
       return;
     }
 
