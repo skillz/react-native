@@ -415,20 +415,28 @@ static css_dim_t RCTMeasure(void *context, float width, float height)
 
   NSRange glyphRange = NSMakeRange(0, textStorage.length);
   [textStorage beginEditing];
-  [textStorage enumerateAttribute:NSFontAttributeName
-                           inRange:glyphRange
-                           options:0
-                        usingBlock:^(UIFont *font, NSRange range, BOOL *stop)
-   {
-     if (font) {
-       UIFont *originalFont = [self.attributedString attribute:NSFontAttributeName
-                                                       atIndex:range.location
-                                                effectiveRange:&range];
-       UIFont *newFont = [font fontWithSize:originalFont.pointSize * scale];
-       [textStorage removeAttribute:NSFontAttributeName range:range];
-       [textStorage addAttribute:NSFontAttributeName value:newFont range:range];
-     }
-   }];
+
+  @try {
+    [textStorage enumerateAttribute:NSFontAttributeName
+                            inRange:glyphRange
+                            options:0
+                         usingBlock:^(UIFont *font, NSRange range, BOOL *stop)
+     {
+       if (font) {
+         UIFont *originalFont = [self.attributedString attribute:NSFontAttributeName
+                                                         atIndex:range.location
+                                                  effectiveRange:&range];
+         UIFont *newFont = [font fontWithSize:originalFont.pointSize * scale];
+         if (newFont) {
+           [textStorage removeAttribute:NSFontAttributeName range:range];
+           [textStorage addAttribute:NSFontAttributeName value:newFont range:range];
+         }
+       }
+     }];
+  }
+  @catch (NSException *exception) {
+    NSLog(@"Enumerating during scaling threw exception but was caught");
+  }
 
   [textStorage endEditing];
 
