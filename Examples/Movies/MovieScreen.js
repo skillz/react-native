@@ -18,7 +18,6 @@
 var React = require('react-native');
 var {
   Image,
-  PixelRatio,
   ScrollView,
   StyleSheet,
   Text,
@@ -162,7 +161,7 @@ var styles = StyleSheet.create({
   },
   separator: {
     backgroundColor: 'rgba(0, 0, 0, 0.1)',
-    height: 1 / PixelRatio.get(),
+    height: StyleSheet.hairlineWidth,
     marginVertical: 10,
   },
   castTitle: {

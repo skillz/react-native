@@ -37,7 +37,7 @@ import com.facebook.react.common.annotations.VisibleForTesting;
 import com.facebook.react.uimanager.IllegalViewOperationException;
 import com.facebook.react.uimanager.LayoutShadowNode;
 import com.facebook.react.uimanager.PixelUtil;
-import com.facebook.react.uimanager.ReactProp;
+import com.facebook.react.uimanager.annotations.ReactProp;
 import com.facebook.react.uimanager.ReactShadowNode;
 import com.facebook.react.uimanager.UIViewOperationQueue;
 import com.facebook.react.uimanager.ViewDefaults;
@@ -161,8 +161,8 @@ public class ReactTextShadowNode extends LayoutShadowNode {
     int start = sb.length();
     // Create our own internal ImageSpan which will allow us to correctly layout the Image
     Resources resources = node.getThemedContext().getResources();
-    int height = (int) PixelUtil.toDIPFromPixel(node.getStyleHeight());
-    int width = (int) PixelUtil.toDIPFromPixel(node.getStyleWidth());
+    int height = (int) Math.ceil(node.getStyleHeight());
+    int width = (int) Math.ceil(node.getStyleWidth());
     TextInlineImageSpan imageSpan = new TextInlineImageSpan(
         resources,
         height,

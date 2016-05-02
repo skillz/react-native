@@ -175,9 +175,7 @@ RCT_EXTERN NSArray<Class> *RCTGetModuleClasses(void);
   dispatch_group_notify(initModulesAndLoadSource, dispatch_get_main_queue(), ^{
     RCTBatchedBridge *strongSelf = weakSelf;
     if (sourceCode && strongSelf.loading) {
-      dispatch_async(bridgeQueue, ^{
-        [weakSelf executeSourceCode:sourceCode];
-      });
+      [strongSelf executeSourceCode:sourceCode];
     }
   });
 }
@@ -220,6 +218,14 @@ RCT_EXTERN NSArray<Class> *RCTGetModuleClasses(void);
                 "trying to access a module too early in the startup procedure.");
   }
   return _moduleClassesByID;
+}
+
+/**
+ * Used by RCTUIManager
+ */
+- (RCTModuleData *)moduleDataForName:(NSString *)moduleName
+{
+  return _moduleDataByName[moduleName];
 }
 
 - (id)moduleForName:(NSString *)moduleName
@@ -327,14 +333,7 @@ RCT_EXTERN NSArray<Class> *RCTGetModuleClasses(void);
 
   for (RCTModuleData *moduleData in _moduleDataByID) {
     if (moduleData.hasInstance) {
-      [moduleData methodQueue]; // initialize the queue
-    }
-  }
-
-  for (RCTModuleData *moduleData in _moduleDataByID) {
-    if (moduleData.hasInstance) {
-      [self registerModuleForFrameUpdates:moduleData.instance
-                           withModuleData:moduleData];
+      [moduleData finishSetupForInstance];
     }
   }
 
@@ -563,6 +562,7 @@ RCT_NOT_IMPLEMENTED(- (instancetype)initWithBundleURL:(__unused NSURL *)bundleUR
   }
 
   RCTAssertMainThread();
+  RCTAssert(_javaScriptExecutor != nil, @"Can't complete invalidation without a JS executor");
 
   _loading = NO;
   _valid = NO;
@@ -598,11 +598,13 @@ RCT_NOT_IMPLEMENTED(- (instancetype)initWithBundleURL:(__unused NSURL *)bundleUR
       if (RCTProfileIsProfiling()) {
         RCTProfileUnhookModules(self);
       }
+
       _moduleDataByName = nil;
       _moduleDataByID = nil;
       _moduleClassesByID = nil;
       _modulesByName_DEPRECATED = nil;
       _frameUpdateObservers = nil;
+      _pendingCalls = nil;
 
     }];
   });

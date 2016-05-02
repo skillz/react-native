@@ -56,10 +56,6 @@ const validateOpts = declareOpts({
     type:'string',
     required: false,
   },
-  enableInternalTransforms: {
-    type: 'boolean',
-    default: false,
-  },
   nonPersistent: {
     type: 'boolean',
     default: false,
@@ -83,6 +79,10 @@ const validateOpts = declareOpts({
   transformTimeoutInterval: {
     type: 'number',
     required: false,
+  },
+  disableInternalTransforms: {
+    type: 'boolean',
+    default: false,
   },
 });
 
@@ -135,7 +135,7 @@ class Bundler {
       blacklistRE: opts.blacklistRE,
       cache: this._cache,
       transformModulePath: opts.transformModulePath,
-      enableInternalTransforms: opts.enableInternalTransforms,
+      disableInternalTransforms: opts.disableInternalTransforms,
     });
 
     this._projectRoots = opts.projectRoots;
@@ -284,29 +284,51 @@ class Bundler {
     });
   }
 
-  bundleForHMR(modules) {
-    return Promise.all(
-      modules.map(module => {
-        return Promise.all([
-          module.getName(),
-          this._transformer.loadFileAndTransform(
-            module.path,
-            // TODO(martinb): pass non null main (t9527509)
-            this._getTransformOptions({main: null}, {hot: true}),
-          ),
-        ]).then(([moduleName, transformedSource]) => {
-          return (`
-            __accept(
-              '${moduleName}',
-              function(global, require, module, exports) {
-                ${transformedSource.code}
-              }
-            );
-          `);
-        });
+  bundleForHMR({entryFile, platform, modules}) {
+    return this.getDependencies(entryFile, /*isDev*/true, platform)
+      .then(response => {
+        return Promise.all(
+          modules.map(module => {
+            return Promise.all([
+              module.getName(),
+              this._transformModuleForHMR(module, platform),
+            ]).then(([moduleName, transformed]) => {
+              return this._resolver.resolveRequires(response,
+                module,
+                transformed.code,
+              ).then(({name, code}) => {
+                return (`
+                  __accept(
+                    '${moduleName}',
+                    function(global, require, module, exports) {
+                      ${code}
+                    }
+                  );
+                `);
+              });
+            });
+          })
+        );
       })
-    )
-    .then(code => code.join('\n'));
+      .then(modules => modules.join('\n'));
+  }
+
+  _transformModuleForHMR(module, platform) {
+    if (module.isAsset()) {
+      return this._generateAssetObjAndCode(module, platform).then(
+        ({asset, code}) => {
+          return {
+            code,
+          };
+        }
+      );
+    } else {
+      return this._transformer.loadFileAndTransform(
+        module.path,
+        // TODO(martinb): pass non null main (t9527509)
+        this._getTransformOptions({main: null}, {hot: true}),
+      );
+    }
   }
 
   invalidateFile(filePath) {
@@ -315,6 +337,10 @@ class Bundler {
 
   getShallowDependencies(entryFile) {
     return this._resolver.getShallowDependencies(entryFile);
+  }
+
+  stat(filePath) {
+    return this._resolver.stat(filePath);
   }
 
   getModuleForPath(entryFile) {
@@ -359,9 +385,9 @@ class Bundler {
 
   _transformModule(bundle, response, module, platform = null, hot = false) {
     if (module.isAsset_DEPRECATED()) {
-      return this.generateAssetModule_DEPRECATED(bundle, module);
+      return this._generateAssetModule_DEPRECATED(bundle, module);
     } else if (module.isAsset()) {
-      return this.generateAssetModule(bundle, module, platform);
+      return this._generateAssetModule(bundle, module, platform);
     } else if (module.isJSON()) {
       return generateJSONModule(module);
     } else {
@@ -396,7 +422,7 @@ class Bundler {
     return this._resolver.getDebugInfo();
   }
 
-  generateAssetModule_DEPRECATED(bundle, module) {
+  _generateAssetModule_DEPRECATED(bundle, module) {
     return Promise.all([
       sizeOf(module.path),
       module.getName(),
@@ -423,7 +449,7 @@ class Bundler {
     });
   }
 
-  generateAssetModule(bundle, module, platform = null) {
+  _generateAssetObjAndCode(module, platform = null) {
     const relPath = getPathRelativeToRoot(this._projectRoots, module.path);
     var assetUrlPath = path.join('/assets', path.dirname(relPath));
 
@@ -438,7 +464,7 @@ class Bundler {
     ]).then(function(res) {
       const dimensions = res[0];
       const assetData = res[1];
-      const img = {
+      const asset = {
         __packager_asset: true,
         fileSystemLocation: path.dirname(module.path),
         httpServerLocation: assetUrlPath,
@@ -451,11 +477,17 @@ class Bundler {
         type: assetData.type,
       };
 
-      bundle.addAsset(img);
-
       const ASSET_TEMPLATE = 'module.exports = require("AssetRegistry").registerAsset(%json);';
-      const code = ASSET_TEMPLATE.replace('%json', JSON.stringify(img));
+      const code = ASSET_TEMPLATE.replace('%json', JSON.stringify(asset));
 
+      return {asset, code};
+    });
+  }
+
+
+  _generateAssetModule(bundle, module, platform = null) {
+    return this._generateAssetObjAndCode(module, platform).then(({asset, code}) => {
+      bundle.addAsset(asset);
       return new ModuleTransport({
         code: code,
         sourceCode: code,

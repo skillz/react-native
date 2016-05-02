@@ -577,7 +577,7 @@ class AnimatedValue extends AnimatedWithChildren {
 
   /**
    * Adds an asynchronous listener to the value so you can observe updates from
-   * animations or whathaveyou.  This is useful because there is no way to
+   * animations.  This is useful because there is no way to
    * synchronously read the value because it might be driven natively.
    */
   addListener(callback: ValueListenerCallback): string {
@@ -1556,7 +1556,7 @@ var event = function(
  * interaction patterns, like drag-and-drop.
  *
  * You can see more example usage in `AnimationExample.js`, the Gratuitous
- * Animation App, and [Animations documentation guide](http://facebook.github.io/react-native/docs/animations.html).
+ * Animation App, and [Animations documentation guide](docs/animations.html).
  *
  * Note that `Animated` is designed to be fully serializable so that animations
  * can be run in a high performance way, independent of the normal JavaScript

@@ -47,7 +47,6 @@ for i in "${artifacts_list[@]}"; do
    artifact_file="${artifacts_dir}/react-native-${RELEASE}.0${i}"
 
    [ -e "${artifact_file}" ] || error "Couldn't find file: ${artifact_file}"
-   [ -e "${artifact_file}.asc" ] || error "Couldn't find file: ${artifact_file}.asc"
 done
 
 success "Generated artifacts for Maven"
@@ -79,6 +78,8 @@ project_name="RNTestProject"
 cd /tmp/
 rm -rf "$project_name"
 react-native init "$project_name"
+
+info "Double checking the versions in package.json and build.gradle are correct:"
 grep "\"react-native\": \"\^${RELEASE}.0-rc\"" "/tmp/${project_name}/package.json" || error "Incorrect version number in /tmp/${project_name}/package.json"
 grep "com.facebook.react:react-native:${RELEASE}.+" "${project_name}/android/app/build.gradle" || error "Incorrect version number in /tmp/${project_name}/android/app/build.gradle"
 
@@ -88,7 +89,7 @@ info "Test the following both on Android and iOS:"
 info "   - Verify that packager opens in new Window"
 info "   - Verify that you see the 'Welcome to React Native' screen"
 info "   - Verify 'Reload JS' works"
-info "   - Test Chrome debugger by adding breakpoints (we don't have tests for Chrome debugging)"
+info "   - Test Chrome debugger by adding breakpoints. We don't have tests for Chrome debugging."
 info ""
 
 info "Press any key to run the sample in Android emulator/device"
@@ -100,10 +101,6 @@ read -n 1
 open "/tmp/${project_name}/ios/${project_name}.xcodeproj"
 
 cd "$repo_root"
-
-info "Press any key to view the diff"
-read -n 1
-git diff
 
 info "Press any key to commit changes"
 read -n 1

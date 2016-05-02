@@ -28,7 +28,7 @@ You can also pack all the JavaScript code within the app itself. This way you ca
 1. Open `AwesomeApp/ios/AwesomeApp/AppDelegate.m`
 2. Follow the instructions for "OPTION 2":
   * Uncomment `jsCodeLocation = [[NSBundle mainBundle] ...`
-  * Run the `react-native bundle` command in terminal from the root directory of your app
+  * Run the `react-native bundle --platform ios --dev false --entry-file index.ios.js --bundle-output iOS/main.jsbundle` command in terminal from the root directory of your app
 
 The bundle script supports a couple of flags:
 
@@ -44,7 +44,7 @@ Note that on 0.14 we'll change the API of `react-native bundle`. The major chang
 
 ## Disabling in-app developer menu
 
-When building your app for production, your app's scheme should be set to `Release` as detailed in [the debugging documentation](/react-native/docs/debugging.html#debugging-react-native-apps) in order to disable the in-app developer menu.
+When building your app for production, your app's scheme should be set to `Release` as detailed in [the debugging documentation](docs/debugging.html#debugging-react-native-apps) in order to disable the in-app developer menu.
 
 ## Troubleshooting
 
