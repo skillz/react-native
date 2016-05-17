@@ -52,6 +52,11 @@
   }];
 }
 
+- (void)reactSetInheritedBackgroundColor:(UIColor *)inheritedBackgroundColor
+{
+  self.backgroundColor = inheritedBackgroundColor;
+}
+
 - (void)insertReactSubview:(UIView *)subview atIndex:(NSInteger)atIndex
 {
   [_reactSubviews insertObject:subview atIndex:atIndex];
@@ -67,14 +72,23 @@
   return _reactSubviews;
 }
 
+- (void)setTextStorage:(NSTextStorage *)textStorage
+{
+  if (_textStorage != textStorage) {
+    _textStorage = textStorage;
+    [self setNeedsDisplay];
+  }
+}
+
 - (void)drawRect:(CGRect)rect
 {
-  NSLayoutManager *layoutManager = [_textStorage.layoutManagers firstObject];
-  NSTextContainer *textContainer = [layoutManager.textContainers firstObject];
-
+  NSLayoutManager *layoutManager = _textStorage.layoutManagers.firstObject;
+  NSTextContainer *textContainer = layoutManager.textContainers.firstObject;
+  CGRect textFrame = UIEdgeInsetsInsetRect(self.bounds, _contentInset);
   NSRange glyphRange = [layoutManager glyphRangeForTextContainer:textContainer];
-  [layoutManager drawBackgroundForGlyphRange:glyphRange atPoint:self.textFrame.origin];
-  [layoutManager drawGlyphsForGlyphRange:glyphRange atPoint:self.textFrame.origin];
+
+  [layoutManager drawBackgroundForGlyphRange:glyphRange atPoint:textFrame.origin];
+  [layoutManager drawGlyphsForGlyphRange:glyphRange atPoint:textFrame.origin];
 
   __block UIBezierPath *highlightPath = nil;
   NSRange characterRange = [layoutManager characterRangeForGlyphRange:glyphRange actualGlyphRange:NULL];
@@ -125,6 +139,7 @@
   }
   return reactTag;
 }
+
 
 - (void)didMoveToWindow
 {

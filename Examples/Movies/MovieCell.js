@@ -15,17 +15,17 @@
  */
 'use strict';
 
-var React = require('react-native');
+var React = require('react');
+var ReactNative = require('react-native');
 var {
   Image,
-  PixelRatio,
   Platform,
   StyleSheet,
   Text,
   TouchableHighlight,
   TouchableNativeFeedback,
   View
-} = React;
+} = ReactNative;
 
 var getStyleFromScore = require('./getStyleFromScore');
 var getImageSource = require('./getImageSource');
@@ -99,8 +99,7 @@ var styles = StyleSheet.create({
   },
   cellBorder: {
     backgroundColor: 'rgba(0, 0, 0, 0.1)',
-    // Trick to get the thinest line the device can display
-    height: 1 / PixelRatio.get(),
+    height: StyleSheet.hairlineWidth,
     marginLeft: 4,
   },
 });

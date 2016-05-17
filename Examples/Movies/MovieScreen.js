@@ -15,15 +15,15 @@
  */
 'use strict';
 
-var React = require('react-native');
+var React = require('react');
+var ReactNative = require('react-native');
 var {
   Image,
-  PixelRatio,
   ScrollView,
   StyleSheet,
   Text,
   View,
-} = React;
+} = ReactNative;
 
 var getImageSource = require('./getImageSource');
 var getStyleFromScore = require('./getStyleFromScore');
@@ -162,7 +162,7 @@ var styles = StyleSheet.create({
   },
   separator: {
     backgroundColor: 'rgba(0, 0, 0, 0.1)',
-    height: 1 / PixelRatio.get(),
+    height: StyleSheet.hairlineWidth,
     marginVertical: 10,
   },
   castTitle: {

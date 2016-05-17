@@ -16,16 +16,19 @@
  */
 'use strict';
 
-var React = require('react-native');
+var React = require('react');
+var ReactNative = require('react-native');
 var {
   Animated,
   Image,
   PanResponder,
   StyleSheet,
   View,
-} = React;
+} = ReactNative;
 
 class AnExChained extends React.Component {
+  state: any;
+
   constructor(props: Object) {
     super(props);
     this.state = {
@@ -77,6 +80,7 @@ class AnExChained extends React.Component {
           return (
             <Animated.Image
               {...handlers}
+              key={i}
               source={{uri: CHAIN_IMGS[j]}}
               style={[styles.sticker, {
                 transform: this.state.stickers[j].getTranslateTransform(), // simple conversion

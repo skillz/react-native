@@ -13,6 +13,11 @@
 
 @interface RCTBridge ()
 
+// Used for the profiler flow events between JS and native
+@property (nonatomic, assign) int64_t flowID;
+@property (nonatomic, assign) CFMutableDictionaryRef flowIDMap;
+@property (nonatomic, strong) NSLock *flowIDMapLock;
+
 + (instancetype)currentBridge;
 + (void)setCurrentBridge:(RCTBridge *)bridge;
 
@@ -51,6 +56,16 @@
 @interface RCTBridge (RCTBatchedBridge)
 
 /**
+ * Used for unit testing, to detect when executor has been invalidated.
+ */
+@property (nonatomic, weak, readonly) id<RCTJavaScriptExecutor> javaScriptExecutor;
+
+/**
+ * Used by RCTModuleData
+ */
+@property (nonatomic, assign, readonly) BOOL moduleSetupComplete;
+
+/**
  * Used by RCTModuleData to register the module for frame updates after it is
  * lazily initialized.
  */
@@ -62,6 +77,12 @@
  * queue. Exposed for the RCTProfiler
  */
 - (void)dispatchBlock:(dispatch_block_t)block queue:(dispatch_queue_t)queue;
+
+/**
+ * Get the module data for a given module name. Used by UIManager to implement
+ * the `dispatchViewManagerCommand` method.
+ */
+- (RCTModuleData *)moduleDataForName:(NSString *)moduleName;
 
 /**
  * Systrace profiler toggling methods exposed for the RCTDevMenu
@@ -94,5 +115,15 @@
  * Allow super fast, one time, timers to skip the queue and be directly executed
  */
 - (void)_immediatelyCallTimer:(NSNumber *)timer;
+
+@end
+
+@interface RCTBatchedBridge : RCTBridge <RCTInvalidating>
+
+@property (nonatomic, weak) RCTBridge *parentBridge;
+@property (nonatomic, weak) id<RCTJavaScriptExecutor> javaScriptExecutor;
+@property (nonatomic, assign) BOOL moduleSetupComplete;
+
+- (instancetype)initWithParentBridge:(RCTBridge *)bridge NS_DESIGNATED_INITIALIZER;
 
 @end

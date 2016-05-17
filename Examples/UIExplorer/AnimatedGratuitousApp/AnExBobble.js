@@ -16,14 +16,15 @@
  */
 'use strict';
 
-var React = require('react-native');
+var React = require('react');
+var ReactNative = require('react-native');
 var {
   Animated,
   Image,
   PanResponder,
   StyleSheet,
   View,
-} = React;
+} = ReactNative;
 
 var NUM_BOBBLES = 5;
 var RAD_EACH = Math.PI / 2 / (NUM_BOBBLES - 2);
@@ -36,6 +37,8 @@ var BOBBLE_SPOTS = [...Array(NUM_BOBBLES)].map((_, i) => {  // static positions
 });
 
 class AnExBobble extends React.Component {
+  state: any;
+
   constructor(props: Object) {
     super(props);
     this.state = {};
@@ -95,6 +98,7 @@ class AnExBobble extends React.Component {
           return (
             <Animated.Image
               {...handlers}
+              key={i}
               source={{uri: BOBBLE_IMGS[j]}}
               style={[styles.circle, {
                 backgroundColor: randColor(),                             // re-renders are obvious

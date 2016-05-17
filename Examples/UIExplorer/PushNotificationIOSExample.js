@@ -15,7 +15,8 @@
  */
 'use strict';
 
-var React = require('react-native');
+var React = require('react');
+var ReactNative = require('react-native');
 var {
   AlertIOS,
   PushNotificationIOS,
@@ -23,7 +24,7 @@ var {
   Text,
   TouchableHighlight,
   View,
-} = React;
+} = ReactNative;
 
 var Button = React.createClass({
   render: function() {
@@ -84,6 +85,8 @@ class NotificationExample extends React.Component {
 }
 
 class NotificationPermissionExample extends React.Component {
+  state: any;
+
   constructor(props) {
     super(props);
     this.state = {permissions: null};
@@ -126,7 +129,7 @@ exports.description = 'Apple PushNotification and badge value';
 exports.examples = [
 {
   title: 'Badge Number',
-  render(): React.Component {
+  render(): ReactElement {
     PushNotificationIOS.requestPermissions();
 
     return (
@@ -145,13 +148,13 @@ exports.examples = [
 },
 {
   title: 'Push Notifications',
-  render(): React.Component {
+  render(): ReactElement {
     return <NotificationExample />;
   }
 },
 {
   title: 'Notifications Permissions',
-  render(): React.Component {
+  render(): ReactElement {
     return <NotificationPermissionExample />;
   }
 }];
