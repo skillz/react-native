@@ -115,11 +115,12 @@ const Text = React.createClass({
     allowFontScaling: React.PropTypes.bool,
     /**
      * Specifies that font should shrink to fit container size.
+     *  @platform ios
      */
     adjustsFontSizeToFit: React.PropTypes.bool,
     /**
-     * Minimum amount that a font should scale down to fit container.
-     * Used in conjuction with adjustsFontSizeToFit
+     * Specifies smallest possible scale a font can reach when adjustsFontSizeToFit is enabled. (values 0.01-1.0).
+     * @platform ios
      */
     minimumFontScale: React.PropTypes.number,
   },
