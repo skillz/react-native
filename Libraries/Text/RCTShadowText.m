@@ -57,6 +57,8 @@ static css_dim_t RCTMeasure(void *context, float width, float height)
     _fontSize = NAN;
     _letterSpacing = NAN;
     _isHighlighted = NO;
+    _adjustsFontSizeToFit = YES;
+    _minimumFontScale = .5;
     _textDecorationStyle = NSUnderlineStyleSingle;
     _opacity = 1.0;
     [[NSNotificationCenter defaultCenter] addObserver:self
