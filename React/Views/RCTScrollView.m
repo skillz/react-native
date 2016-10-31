@@ -145,7 +145,7 @@ RCT_NOT_IMPLEMENTED(- (instancetype)init)
 
 @property (nonatomic, copy) NSIndexSet *stickyHeaderIndices;
 @property (nonatomic, assign) BOOL centerContent;
-@property (nonatomic, strong) UIRefreshControl *refreshControl;
+@property (nonatomic, strong) UIRefreshControl *rctRefreshControl;
 
 @end
 
@@ -361,13 +361,13 @@ RCT_NOT_IMPLEMENTED(- (instancetype)init)
   return hitView ?: [super hitTest:point withEvent:event];
 }
 
-- (void)setRefreshControl:(UIRefreshControl *)refreshControl
+- (void)setRefreshControl:(UIRefreshControl *)rctRefreshControl
 {
-  if (_refreshControl) {
-    [_refreshControl removeFromSuperview];
+  if (_rctRefreshControl) {
+    [_rctRefreshControl removeFromSuperview];
   }
-  _refreshControl = refreshControl;
-  [self addSubview:_refreshControl];
+  _rctRefreshControl = rctRefreshControl;
+  [self addSubview:_rctRefreshControl];
 }
 
 @end
@@ -419,7 +419,7 @@ RCT_NOT_IMPLEMENTED(- (instancetype)initWithCoder:(NSCoder *)aDecoder)
 - (void)insertReactSubview:(UIView *)view atIndex:(__unused NSInteger)atIndex
 {
   if ([view isKindOfClass:[RCTRefreshControl class]]) {
-    _scrollView.refreshControl = (RCTRefreshControl*)view;
+    _scrollView.rctRefreshControl = (RCTRefreshControl*)view;
   } else {
     RCTAssert(_contentView == nil, @"RCTScrollView may only contain a single subview");
     _contentView = view;
@@ -430,7 +430,7 @@ RCT_NOT_IMPLEMENTED(- (instancetype)initWithCoder:(NSCoder *)aDecoder)
 - (void)removeReactSubview:(UIView *)subview
 {
   if ([subview isKindOfClass:[RCTRefreshControl class]]) {
-    _scrollView.refreshControl = nil;
+    _scrollView.rctRefreshControl = nil;
   } else {
     RCTAssert(_contentView == subview, @"Attempted to remove non-existent subview");
     _contentView = nil;
@@ -440,8 +440,8 @@ RCT_NOT_IMPLEMENTED(- (instancetype)initWithCoder:(NSCoder *)aDecoder)
 
 - (NSArray<UIView *> *)reactSubviews
 {
-  if (_contentView && _scrollView.refreshControl) {
-    return @[_contentView, _scrollView.refreshControl];
+  if (_contentView && _scrollView.rctRefreshControl) {
+    return @[_contentView, _scrollView.rctRefreshControl];
   }
   return _contentView ? @[_contentView] : @[];
 }
@@ -877,19 +877,19 @@ RCT_SET_AND_PRESERVE_OFFSET(setScrollIndicatorInsets, UIEdgeInsets);
 {
   if (!onRefreshStart) {
     _onRefreshStart = nil;
-    _scrollView.refreshControl = nil;
+    _scrollView.rctRefreshControl = nil;
     return;
   }
   _onRefreshStart = [onRefreshStart copy];
 
-  if (!_scrollView.refreshControl) {
-    UIRefreshControl *refreshControl = [[UIRefreshControl alloc] init];
-    [refreshControl addTarget:self action:@selector(refreshControlValueChanged) forControlEvents:UIControlEventValueChanged];
-    _scrollView.refreshControl = refreshControl;
+  if (!_scrollView.rctRefreshControl) {
+    UIRefreshControl *rctRefreshControl = [[UIRefreshControl alloc] init];
+    [rctRefreshControl addTarget:self action:@selector(rctRefreshControlValueChanged) forControlEvents:UIControlEventValueChanged];
+    _scrollView.rctRefreshControl = rctRefreshControl;
   }
 }
 
-- (void)refreshControlValueChanged
+- (void)rctRefreshControlValueChanged
 {
   if (self.onRefreshStart) {
     self.onRefreshStart(nil);
@@ -898,7 +898,7 @@ RCT_SET_AND_PRESERVE_OFFSET(setScrollIndicatorInsets, UIEdgeInsets);
 
 - (void)endRefreshing
 {
-  [_scrollView.refreshControl endRefreshing];
+  [_scrollView.rctRefreshControl endRefreshing];
 }
 
 @end
