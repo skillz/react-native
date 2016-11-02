@@ -462,7 +462,12 @@ RCT_EXPORT_METHOD(show)
   actionSheet.cancelButtonIndex = actionSheet.numberOfButtons - 1;
 
   actionSheet.actionSheetStyle = UIBarStyleBlack;
-  [actionSheet showInView:RCTKeyWindow().rootViewController.view];
+  UIViewController *currentVC = RCTKeyWindow().rootViewController;
+  while (currentVC.presentedViewController) {
+    currentVC = currentVC.presentedViewController;
+  }
+    
+  [actionSheet showInView:currentVC.view];
   _actionSheet = actionSheet;
   _presentedItems = items;
 }
