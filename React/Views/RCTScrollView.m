@@ -276,6 +276,12 @@ RCT_NOT_IMPLEMENTED(- (instancetype)init)
   UIView *contentView = [self contentView];
   CGFloat scrollTop = self.bounds.origin.y + self.contentInset.top;
 
+#if !TARGET_OS_TV
+  if (_rctRefreshControl != nil && _rctRefreshControl.refreshing) {
+    scrollTop -= _rctRefreshControl.frame.size.height;
+  }
+#endif
+
   // Find the section headers that need to be docked
   __block UIView *previousHeader = nil;
   __block UIView *currentHeader = nil;
@@ -361,14 +367,16 @@ RCT_NOT_IMPLEMENTED(- (instancetype)init)
   return hitView ?: [super hitTest:point withEvent:event];
 }
 
-- (void)setRefreshControl:(UIRefreshControl *)rctRefreshControl
+#if !TARGET_OS_TV
+- (void)setRctRefreshControl:(RCTRefreshControl *)refreshControl
 {
   if (_rctRefreshControl) {
     [_rctRefreshControl removeFromSuperview];
   }
-  _rctRefreshControl = rctRefreshControl;
+  _rctRefreshControl = refreshControl;
   [self addSubview:_rctRefreshControl];
 }
+#endif //TARGET_OS_TV
 
 @end
 
@@ -429,9 +437,12 @@ RCT_NOT_IMPLEMENTED(- (instancetype)initWithCoder:(NSCoder *)aDecoder)
 
 - (void)removeReactSubview:(UIView *)subview
 {
+#if !TARGET_OS_TV
   if ([subview isKindOfClass:[RCTRefreshControl class]]) {
-    _scrollView.rctRefreshControl = nil;
-  } else {
+    [_scrollView setRctRefreshControl:nil];
+  } else
+#endif
+  {
     RCTAssert(_contentView == subview, @"Attempted to remove non-existent subview");
     _contentView = nil;
     [subview removeFromSuperview];
