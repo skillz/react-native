@@ -11,7 +11,7 @@ package com.facebook.react.views.art;
 
 import android.view.View;
 
-import com.facebook.react.uimanager.CatalystStylesDiffMap;
+import com.facebook.react.uimanager.ReactStylesDiffMap;
 import com.facebook.react.uimanager.ReactShadowNode;
 import com.facebook.react.uimanager.ThemedReactContext;
 import com.facebook.react.uimanager.ViewManager;
@@ -52,11 +52,11 @@ public class ARTRenderableViewManager extends ViewManager<View, ReactShadowNode>
 
   @Override
   public ReactShadowNode createShadowNodeInstance() {
-    if (mClassName == CLASS_GROUP) {
+    if (CLASS_GROUP.equals(mClassName)) {
       return new ARTGroupShadowNode();
-    } else if (mClassName == CLASS_SHAPE) {
+    } else if (CLASS_SHAPE.equals(mClassName)) {
       return new ARTShapeShadowNode();
-    } else if (mClassName == CLASS_TEXT) {
+    } else if (CLASS_TEXT.equals(mClassName)) {
       return new ARTTextShadowNode();
     } else {
       throw new IllegalStateException("Unexpected type " + mClassName);
@@ -65,11 +65,11 @@ public class ARTRenderableViewManager extends ViewManager<View, ReactShadowNode>
 
   @Override
   public Class<? extends ReactShadowNode> getShadowNodeClass() {
-    if (mClassName == CLASS_GROUP) {
+    if (CLASS_GROUP.equals(mClassName)) {
       return ARTGroupShadowNode.class;
-    } else if (mClassName == CLASS_SHAPE) {
+    } else if (CLASS_SHAPE.equals(mClassName)) {
       return ARTShapeShadowNode.class;
-    } else if (mClassName == CLASS_TEXT) {
+    } else if (CLASS_TEXT.equals(mClassName)) {
       return ARTTextShadowNode.class;
     } else {
       throw new IllegalStateException("Unexpected type " + mClassName);

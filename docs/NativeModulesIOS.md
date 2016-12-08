@@ -5,6 +5,7 @@ layout: docs
 category: Guides (iOS)
 permalink: docs/native-modules-ios.html
 next: native-components-ios
+previous: gesture-responder-system
 ---
 
 Sometimes an app needs access to platform API, and React Native doesn't have a corresponding module yet. Maybe you want to reuse some existing Objective-C, Swift or C++ code without having to reimplement it in JavaScript, or write some high performance, multi-threaded code such as for image processing, a database, or any number of advanced extensions.
@@ -50,7 +51,8 @@ RCT_EXPORT_METHOD(addEvent:(NSString *)name location:(NSString *)location)
 Now, from your JavaScript file you can call the method like this:
 
 ```javascript
-var CalendarManager = require('react-native').NativeModules.CalendarManager;
+import { NativeModules } from 'react-native';
+var CalendarManager = NativeModules.CalendarManager;
 CalendarManager.addEvent('Birthday Party', '4 Privet Drive, Surrey');
 ```
 
@@ -58,7 +60,7 @@ CalendarManager.addEvent('Birthday Party', '4 Privet Drive, Surrey');
 >
 > The name of the method exported to JavaScript is the native method's name up to the first colon. React Native also defines a macro called `RCT_REMAP_METHOD()` to specify the JavaScript method's name. This is useful when multiple native methods are the same up to the first colon and would have conflicting JavaScript names.
 
-The return type of bridge methods is always `void`. React Native bridge is asynchronous, so the only way to pass a result to JavaScript is by using callbacks or emitting events (see below).
+The CalendarManager module is instantiated on the Objective-C side using a [CalendarManager new] call. The return type of bridge methods is always `void`. React Native bridge is asynchronous, so the only way to pass a result to JavaScript is by using callbacks or emitting events (see below).
 
 ## Argument Types
 
@@ -68,7 +70,7 @@ The return type of bridge methods is always `void`. React Native bridge is async
 - number (`NSInteger`, `float`, `double`, `CGFloat`, `NSNumber`)
 - boolean (`BOOL`, `NSNumber`)
 - array (`NSArray`) of any types from this list
-- map (`NSDictionary`) with string keys and values of any type from this list
+- object (`NSDictionary`) with string keys and values of any type from this list
 - function (`RCTResponseSenderBlock`)
 
 But it also works with any type that is supported by the `RCTConvert` class (see [`RCTConvert`](https://github.com/facebook/react-native/blob/master/React/Base/RCTConvert.h) for details). The `RCTConvert` helper functions all accept a JSON value as input and map it to a native Objective-C type or class.
@@ -132,7 +134,7 @@ and call it from JavaScript:
 ```javascript
 CalendarManager.addEvent('Birthday Party', {
   location: '4 Privet Drive, Surrey',
-  time: date.toTime(),
+  time: date.getTime(),
   description: '...'
 })
 ```
@@ -188,7 +190,8 @@ RCT_REMAP_METHOD(findEvents,
   if (events) {
     resolve(events);
   } else {
-    reject(error);
+    NSError *error = ...
+    reject(@"no_events", @"There were no events", error);
   }
 }
 ```
@@ -286,7 +289,7 @@ You must create a class extension of RCTConvert like so:
 @implementation RCTConvert (StatusBarAnimation)
   RCT_ENUM_CONVERTER(UIStatusBarAnimation, (@{ @"statusBarAnimationNone" : @(UIStatusBarAnimationNone),
                                                @"statusBarAnimationFade" : @(UIStatusBarAnimationFade),
-                                               @"statusBarAnimationSlide" : @(UIStatusBarAnimationSlide)},
+                                               @"statusBarAnimationSlide" : @(UIStatusBarAnimationSlide)}),
                       UIStatusBarAnimationNone, integerValue)
 @end
 ```
@@ -333,7 +336,7 @@ The native module can signal events to JavaScript without being invoked directly
 JavaScript code can subscribe to these events:
 
 ```javascript
-var { NativeAppEventEmitter } = require('react-native');
+import { NativeAppEventEmitter } from 'react-native';
 
 var subscription = NativeAppEventEmitter.addListener(
   'EventReminder',

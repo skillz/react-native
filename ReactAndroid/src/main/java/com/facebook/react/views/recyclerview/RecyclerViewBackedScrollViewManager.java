@@ -10,7 +10,7 @@ import android.view.View;
 
 import com.facebook.react.bridge.ReadableArray;
 import com.facebook.react.common.MapBuilder;
-import com.facebook.react.uimanager.ReactProp;
+import com.facebook.react.uimanager.annotations.ReactProp;
 import com.facebook.react.uimanager.ThemedReactContext;
 import com.facebook.react.uimanager.ViewGroupManager;
 import com.facebook.react.views.scroll.ReactScrollViewCommandHelper;
@@ -75,16 +75,9 @@ public class RecyclerViewBackedScrollViewManager extends
 
   @Override
   public void scrollTo(
-      RecyclerViewBackedScrollView view,
+      RecyclerViewBackedScrollView scrollView,
       ReactScrollViewCommandHelper.ScrollToCommandData data) {
-    view.scrollTo(data.mDestX, data.mDestY, true);
-  }
-
-  @Override
-  public void scrollWithoutAnimationTo(
-      RecyclerViewBackedScrollView view,
-      ReactScrollViewCommandHelper.ScrollToCommandData data) {
-    view.scrollTo(data.mDestX, data.mDestY, false);
+    scrollView.scrollTo(data.mDestX, data.mDestY, data.mAnimated);
   }
 
   @Override
@@ -92,9 +85,6 @@ public class RecyclerViewBackedScrollViewManager extends
   Map getExportedCustomDirectEventTypeConstants() {
     return MapBuilder.builder()
         .put(ScrollEventType.SCROLL.getJSEventName(), MapBuilder.of("registrationName", "onScroll"))
-        .put(
-            ContentSizeChangeEvent.EVENT_NAME,
-            MapBuilder.of("registrationName", "onContentSizeChange"))
         .build();
   }
 }

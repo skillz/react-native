@@ -11,7 +11,6 @@
 
 'use strict';
 
-var Set = require('Set');
 var DeviceEventManager = require('NativeModules').DeviceEventManager;
 var RCTDeviceEventEmitter = require('RCTDeviceEventEmitter');
 
@@ -24,12 +23,16 @@ type BackPressEventName = $Enum<{
 var _backPressSubscriptions = new Set();
 
 RCTDeviceEventEmitter.addListener(DEVICE_BACK_EVENT, function() {
+  var backPressSubscriptions = new Set(_backPressSubscriptions);
   var invokeDefault = true;
-  _backPressSubscriptions.forEach((subscription) => {
-    if (subscription()) {
+  var subscriptions = [...backPressSubscriptions].reverse();
+  for (var i = 0; i < subscriptions.length; ++i) {
+    if (subscriptions[i]()) {
       invokeDefault = false;
-    }
-  });
+      break;
+    };
+  }
+
   if (invokeDefault) {
     BackAndroid.exitApp();
   }
@@ -41,13 +44,16 @@ RCTDeviceEventEmitter.addListener(DEVICE_BACK_EVENT, function() {
  *
  * Example:
  *
- * ```js
+ * ```javascript
  * BackAndroid.addEventListener('hardwareBackPress', function() {
- * 	 if (!this.onMainScreen()) {
- * 	   this.goBack();
- * 	   return true;
- * 	 }
- * 	 return false;
+ *  // this.onMainScreen and this.goBack are just examples, you need to use your own implementation here
+ *  // Typically you would use the navigator here to go to the last state.
+ *
+ *  if (!this.onMainScreen()) {
+ *    this.goBack();
+ *    return true;
+ *  }
+ *  return false;
  * });
  * ```
  */
@@ -60,8 +66,11 @@ var BackAndroid = {
   addEventListener: function (
     eventName: BackPressEventName,
     handler: Function
-  ): void {
+  ): {remove: () => void} {
     _backPressSubscriptions.add(handler);
+    return {
+      remove: () => BackAndroid.removeEventListener(eventName, handler),
+    };
   },
 
   removeEventListener: function(

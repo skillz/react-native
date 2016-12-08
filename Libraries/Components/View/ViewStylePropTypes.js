@@ -12,8 +12,9 @@
 'use strict';
 
 var LayoutPropTypes = require('LayoutPropTypes');
-var ReactPropTypes = require('ReactPropTypes');
+var ReactPropTypes = require('react/lib/ReactPropTypes');
 var ColorPropType = require('ColorPropType');
+var ShadowPropTypesIOS = require('ShadowPropTypesIOS');
 var TransformPropTypes = require('TransformPropTypes');
 
 /**
@@ -21,6 +22,7 @@ var TransformPropTypes = require('TransformPropTypes');
  */
 var ViewStylePropTypes = {
   ...LayoutPropTypes,
+  ...ShadowPropTypesIOS,
   ...TransformPropTypes,
   backfaceVisibility: ReactPropTypes.oneOf(['visible', 'hidden']),
   backgroundColor: ColorPropType,
@@ -42,12 +44,6 @@ var ViewStylePropTypes = {
   borderLeftWidth: ReactPropTypes.number,
   opacity: ReactPropTypes.number,
   overflow: ReactPropTypes.oneOf(['visible', 'hidden']),
-  shadowColor: ColorPropType,
-  shadowOffset: ReactPropTypes.shape(
-    {width: ReactPropTypes.number, height: ReactPropTypes.number}
-  ),
-  shadowOpacity: ReactPropTypes.number,
-  shadowRadius: ReactPropTypes.number,
   /**
    * (Android-only) Sets the elevation of a view, using Android's underlying
    * [elevation API](https://developer.android.com/training/material/shadows-clipping.html#Elevation).

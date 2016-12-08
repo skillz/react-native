@@ -14,17 +14,16 @@ import javax.annotation.Nullable;
 import java.util.Map;
 
 import android.graphics.Color;
-import android.os.SystemClock;
 import android.support.v4.widget.SwipeRefreshLayout;
 import android.support.v4.widget.SwipeRefreshLayout.OnRefreshListener;
 
 import com.facebook.react.bridge.ReadableArray;
 import com.facebook.react.common.MapBuilder;
-import com.facebook.react.uimanager.ReactProp;
 import com.facebook.react.uimanager.ThemedReactContext;
 import com.facebook.react.uimanager.UIManagerModule;
 import com.facebook.react.uimanager.ViewGroupManager;
 import com.facebook.react.uimanager.ViewProps;
+import com.facebook.react.uimanager.annotations.ReactProp;
 
 /**
  * ViewManager for {@link ReactSwipeRefreshLayout} which allows the user to "pull to refresh" a
@@ -47,7 +46,7 @@ public class SwipeRefreshLayoutManager extends ViewGroupManager<ReactSwipeRefres
     view.setEnabled(enabled);
   }
 
-  @ReactProp(name = "colors")
+  @ReactProp(name = "colors", customType = "ColorArray")
   public void setColors(ReactSwipeRefreshLayout view, @Nullable ReadableArray colors) {
     if (colors != null) {
       int[] colorValues = new int[colors.size()];
@@ -75,6 +74,11 @@ public class SwipeRefreshLayoutManager extends ViewGroupManager<ReactSwipeRefres
     view.setRefreshing(refreshing);
   }
 
+  @ReactProp(name = "progressViewOffset", defaultFloat = 0)
+  public void setProgressViewOffset(final ReactSwipeRefreshLayout view, final float offset) {
+    view.setProgressViewOffset(offset);
+  }
+
   @Override
   protected void addEventEmitters(
       final ThemedReactContext reactContext,
@@ -84,7 +88,7 @@ public class SwipeRefreshLayoutManager extends ViewGroupManager<ReactSwipeRefres
           @Override
           public void onRefresh() {
             reactContext.getNativeModule(UIManagerModule.class).getEventDispatcher()
-                .dispatchEvent(new RefreshEvent(view.getId(), SystemClock.uptimeMillis()));
+                .dispatchEvent(new RefreshEvent(view.getId()));
           }
         });
   }

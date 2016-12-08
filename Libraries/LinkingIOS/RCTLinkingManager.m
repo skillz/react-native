@@ -17,29 +17,24 @@ NSString *const RCTOpenURLNotification = @"RCTOpenURLNotification";
 
 @implementation RCTLinkingManager
 
-@synthesize bridge = _bridge;
-
 RCT_EXPORT_MODULE()
 
-- (void)setBridge:(RCTBridge *)bridge
+- (void)startObserving
 {
-  _bridge = bridge;
-
   [[NSNotificationCenter defaultCenter] addObserver:self
                                            selector:@selector(handleOpenURLNotification:)
                                                name:RCTOpenURLNotification
                                              object:nil];
 }
 
-- (NSDictionary<NSString *, id> *)constantsToExport
-{
-  NSURL *initialURL = _bridge.launchOptions[UIApplicationLaunchOptionsURLKey];
-  return @{@"initialURL": RCTNullIfNil(initialURL.absoluteString)};
-}
-
-- (void)dealloc
+- (void)stopObserving
 {
   [[NSNotificationCenter defaultCenter] removeObserver:self];
+}
+
+- (NSArray<NSString *> *)supportedEvents
+{
+  return @[@"url"];
 }
 
 + (BOOL)application:(UIApplication *)application
@@ -69,30 +64,57 @@ continueUserActivity:(NSUserActivity *)userActivity
 
 - (void)handleOpenURLNotification:(NSNotification *)notification
 {
-  [_bridge.eventDispatcher sendDeviceEventWithName:@"openURL"
-                                              body:notification.userInfo];
+  [self sendEventWithName:@"url" body:notification.userInfo];
 }
 
-RCT_EXPORT_METHOD(openURL:(NSURL *)URL)
+RCT_EXPORT_METHOD(openURL:(NSURL *)URL
+                  resolve:(RCTPromiseResolveBlock)resolve
+                  reject:(RCTPromiseRejectBlock)reject)
 {
-  // TODO: we should really return success/failure via a callback here
-  // Doesn't really matter what thread we call this on since it exits the app
-  [RCTSharedApplication() openURL:URL];
+  BOOL opened = [RCTSharedApplication() openURL:URL];
+  if (opened) {
+    resolve(nil);
+  } else {
+    reject(RCTErrorUnspecified, [NSString stringWithFormat:@"Unable to open URL: %@", URL], nil);
+  }
 }
 
 RCT_EXPORT_METHOD(canOpenURL:(NSURL *)URL
-                  callback:(RCTResponseSenderBlock)callback)
+                  resolve:(RCTPromiseResolveBlock)resolve
+                  reject:(__unused RCTPromiseRejectBlock)reject)
 {
   if (RCTRunningInAppExtension()) {
     // Technically Today widgets can open urls, but supporting that would require
     // a reference to the NSExtensionContext
-    callback(@[@NO]);
+    resolve(@NO);
     return;
   }
 
+  // TODO: on iOS9 this will fail if URL isn't included in the plist
+  // we should probably check for that and reject in that case instead of
+  // simply resolving with NO
+
   // This can be expensive, so we deliberately don't call on main thread
   BOOL canOpen = [RCTSharedApplication() canOpenURL:URL];
-  callback(@[@(canOpen)]);
+  resolve(@(canOpen));
+}
+
+RCT_EXPORT_METHOD(getInitialURL:(RCTPromiseResolveBlock)resolve
+                  reject:(__unused RCTPromiseRejectBlock)reject)
+{
+  NSURL *initialURL = nil;
+  if (self.bridge.launchOptions[UIApplicationLaunchOptionsURLKey]) {
+    initialURL = self.bridge.launchOptions[UIApplicationLaunchOptionsURLKey];
+  } else if (&UIApplicationLaunchOptionsUserActivityDictionaryKey &&
+             self.bridge.launchOptions[UIApplicationLaunchOptionsUserActivityDictionaryKey]) {
+    NSDictionary *userActivityDictionary =
+      self.bridge.launchOptions[UIApplicationLaunchOptionsUserActivityDictionaryKey];
+
+    if ([userActivityDictionary[UIApplicationLaunchOptionsUserActivityTypeKey] isEqual:NSUserActivityTypeBrowsingWeb]) {
+      initialURL = ((NSUserActivity *)userActivityDictionary[@"UIApplicationLaunchOptionsUserActivityKey"]).webpageURL;
+    }
+  }
+  resolve(RCTNullIfNil(initialURL.absoluteString));
 }
 
 @end

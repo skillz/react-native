@@ -33,6 +33,7 @@
     _request = request;
     _handler = handler;
     _completionBlock = completionBlock;
+    _status = RCTNetworkTaskPending;
   }
   return self;
 }
@@ -55,12 +56,14 @@ RCT_NOT_IMPLEMENTED(- (instancetype)init)
     if ([self validateRequestToken:[_handler sendRequest:_request
                                             withDelegate:self]]) {
       _selfReference = self;
+      _status = RCTNetworkTaskInProgress;
     }
   }
 }
 
 - (void)cancel
 {
+  _status = RCTNetworkTaskFinished;
   __strong id strongToken = _requestToken;
   if (strongToken && [_handler respondsToSelector:@selector(cancelRequest:)]) {
     [_handler cancelRequest:strongToken];
@@ -70,24 +73,30 @@ RCT_NOT_IMPLEMENTED(- (instancetype)init)
 
 - (BOOL)validateRequestToken:(id)requestToken
 {
+  BOOL valid = YES;
   if (_requestToken == nil) {
     if (requestToken == nil) {
-      return NO;
+      if (RCT_DEBUG) {
+        RCTLogError(@"Missing request token for request: %@", _request);
+      }
+      valid = NO;
     }
     _requestToken = requestToken;
-  }
-  if (![requestToken isEqual:_requestToken]) {
+  } else if (![requestToken isEqual:_requestToken]) {
     if (RCT_DEBUG) {
       RCTLogError(@"Unrecognized request token: %@ expected: %@", requestToken, _requestToken);
     }
-    if (_completionBlock) {
-      _completionBlock(_response, _data, [NSError errorWithDomain:RCTErrorDomain code:0
-        userInfo:@{NSLocalizedDescriptionKey: @"Unrecognized request token."}]);
-      [self invalidate];
-    }
-    return NO;
+    valid = NO;
   }
-  return YES;
+  if (!valid) {
+    _status = RCTNetworkTaskFinished;
+    if (_completionBlock) {
+      _completionBlock(_response, nil, [NSError errorWithDomain:RCTErrorDomain code:0
+        userInfo:@{NSLocalizedDescriptionKey: @"Invalid request token."}]);
+    }
+    [self invalidate];
+  }
+  return valid;
 }
 
 - (void)URLRequest:(id)requestToken didSendDataWithProgress:(int64_t)bytesSent
@@ -117,7 +126,7 @@ RCT_NOT_IMPLEMENTED(- (instancetype)init)
     }
     [_data appendData:data];
     if (_incrementalDataBlock) {
-      _incrementalDataBlock(data);
+      _incrementalDataBlock(data, _data.length, _response.expectedContentLength);
     }
     if (_downloadProgressBlock && _response.expectedContentLength > 0) {
       _downloadProgressBlock(_data.length, _response.expectedContentLength);
@@ -128,10 +137,11 @@ RCT_NOT_IMPLEMENTED(- (instancetype)init)
 - (void)URLRequest:(id)requestToken didCompleteWithError:(NSError *)error
 {
   if ([self validateRequestToken:requestToken]) {
+    _status = RCTNetworkTaskFinished;
     if (_completionBlock) {
       _completionBlock(_response, _data, error);
-      [self invalidate];
     }
+    [self invalidate];
   }
 }
 

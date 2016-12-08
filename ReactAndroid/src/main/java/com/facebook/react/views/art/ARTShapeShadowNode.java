@@ -20,7 +20,7 @@ import com.facebook.common.logging.FLog;
 import com.facebook.react.bridge.JSApplicationIllegalArgumentException;
 import com.facebook.react.bridge.ReadableArray;
 import com.facebook.react.common.ReactConstants;
-import com.facebook.react.uimanager.ReactProp;
+import com.facebook.react.uimanager.annotations.ReactProp;
 
 /**
  * Shadow node for virtual ARTShape view
@@ -101,10 +101,10 @@ public class ARTShapeShadowNode extends ARTVirtualNode {
         throw new JSApplicationIllegalArgumentException(
             "Shapes should have a valid path (d) prop");
       }
-      if (setupStrokePaint(paint, opacity)) {
+      if (setupFillPaint(paint, opacity)) {
         canvas.drawPath(mPath, paint);
       }
-      if (setupFillPaint(paint, opacity)) {
+      if (setupStrokePaint(paint, opacity)) {
         canvas.drawPath(mPath, paint);
       }
       restoreCanvas(canvas);

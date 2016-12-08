@@ -10,15 +10,25 @@
 
 const Activity = require('../Activity');
 const AssetServer = require('../AssetServer');
-const FileWatcher = require('../DependencyResolver/FileWatcher');
-const getPlatformExtension = require('../DependencyResolver/lib/getPlatformExtension');
+const FileWatcher = require('../node-haste').FileWatcher;
+const getPlatformExtension = require('../node-haste').getPlatformExtension;
 const Bundler = require('../Bundler');
 const Promise = require('promise');
+const SourceMapConsumer = require('source-map').SourceMapConsumer;
 
-const _ = require('underscore');
 const declareOpts = require('../lib/declareOpts');
+const defaultAssetExts = require('../../../defaultAssetExts');
+const mime = require('mime-types');
 const path = require('path');
 const url = require('url');
+
+function debounce(fn, delay) {
+  var timeout;
+  return () => {
+    clearTimeout(timeout);
+    timeout = setTimeout(fn, delay);
+  };
+}
 
 const validateOpts = declareOpts({
   projectRoots: {
@@ -45,14 +55,14 @@ const validateOpts = declareOpts({
     default: false,
   },
   transformModulePath: {
-    type:'string',
+    type: 'string',
+    required: false,
+  },
+  extraNodeModules: {
+    type: 'object',
     required: false,
   },
   nonPersistent: {
-    type: 'boolean',
-    default: false,
-  },
-  enableInternalTransforms: {
     type: 'boolean',
     default: false,
   },
@@ -62,7 +72,7 @@ const validateOpts = declareOpts({
   },
   assetExts: {
     type: 'array',
-    default: ['png', 'jpg', 'jpeg', 'bmp', 'gif', 'webp'],
+    default: defaultAssetExts,
   },
   transformTimeoutInterval: {
     type: 'number',
@@ -71,7 +81,11 @@ const validateOpts = declareOpts({
   getTransformOptionsModulePath: {
     type: 'string',
     required: false,
-  }
+  },
+  silent: {
+    type: 'boolean',
+    default: false,
+  },
 });
 
 const bundleOpts = declareOpts({
@@ -118,6 +132,14 @@ const bundleOpts = declareOpts({
     type: 'boolean',
     default: false,
   },
+  entryModuleOnly: {
+    type: 'boolean',
+    default: false,
+  },
+  isolateModuleIDs: {
+    type: 'boolean',
+    default: false
+  }
 });
 
 const dependencyOpts = declareOpts({
@@ -133,6 +155,14 @@ const dependencyOpts = declareOpts({
     type: 'string',
     required: true,
   },
+  recursive: {
+    type: 'boolean',
+    default: true,
+  },
+  hot: {
+    type: 'boolean',
+    default: false,
+  },
 });
 
 class Server {
@@ -146,7 +176,7 @@ class Server {
 
     const assetGlobs = opts.assetExts.map(ext => '**/*.' + ext);
 
-    var watchRootConfigs = opts.projectRoots.map(dir => {
+    let watchRootConfigs = opts.projectRoots.map(dir => {
       return {
         dir: dir,
         globs: [
@@ -169,7 +199,7 @@ class Server {
 
     this._fileWatcher = options.nonPersistent
       ? FileWatcher.createDummyWatcher()
-      : new FileWatcher(watchRootConfigs);
+      : new FileWatcher(watchRootConfigs, {useWatchman: true});
 
     this._assetServer = new AssetServer({
       projectRoots: opts.projectRoots,
@@ -183,16 +213,8 @@ class Server {
 
     this._fileWatcher.on('all', this._onFileChange.bind(this));
 
-    this._debouncedFileChangeHandler = _.debounce(filePath => {
-      // if Hot Loading is enabled avoid rebuilding bundles and sending live
-      // updates. Instead, send the HMR updates right away and once that
-      // finishes, invoke any other file change listener.
-      if (this._hmrFileChangeListener) {
-        this._hmrFileChangeListener(filePath);
-        return;
-      }
-
-      this._rebuildBundles(filePath);
+    this._debouncedFileChangeHandler = debounce(filePath => {
+      this._clearBundles();
       this._informChangeWatchers();
     }, 50);
   }
@@ -206,6 +228,12 @@ class Server {
 
   setHMRFileChangeListener(listener) {
     this._hmrFileChangeListener = listener;
+  }
+
+  addFileChangeListener(listener) {
+    if (this._fileChangeListeners.indexOf(listener) === -1) {
+      this._fileChangeListeners.push(listener);
+    }
   }
 
   buildBundle(options) {
@@ -235,12 +263,19 @@ class Server {
     return this.buildBundle(options);
   }
 
-  buildBundleForHMR(modules) {
-    return this._bundler.bundleForHMR(modules);
+  buildBundleForHMR(modules, host, port) {
+    return this._bundler.hmrBundle(modules, host, port);
   }
 
-  getShallowDependencies(entryFile) {
-    return this._bundler.getShallowDependencies(entryFile);
+  getShallowDependencies(options) {
+    return Promise.resolve().then(() => {
+      if (!options.platform) {
+        options.platform = getPlatformExtension(options.entryFile);
+      }
+
+      const opts = dependencyOpts(options);
+      return this._bundler.getShallowDependencies(opts);
+    });
   }
 
   getModuleForPath(entryFile) {
@@ -254,11 +289,7 @@ class Server {
       }
 
       const opts = dependencyOpts(options);
-      return this._bundler.getDependencies(
-        opts.entryFile,
-        opts.dev,
-        opts.platform,
-      );
+      return this._bundler.getDependencies(opts);
     });
   }
 
@@ -272,33 +303,33 @@ class Server {
   _onFileChange(type, filepath, root) {
     const absPath = path.join(root, filepath);
     this._bundler.invalidateFile(absPath);
+
+    // If Hot Loading is enabled avoid rebuilding bundles and sending live
+    // updates. Instead, send the HMR updates right away and clear the bundles
+    // cache so that if the user reloads we send them a fresh bundle
+    if (this._hmrFileChangeListener) {
+      // Clear cached bundles in case user reloads
+      this._clearBundles();
+      this._hmrFileChangeListener(absPath, this._bundler.stat(absPath));
+      return;
+    }
+
+    Promise.all(
+      this._fileChangeListeners.map(listener => listener(absPath))
+    ).then(
+      () => this._onFileChangeComplete(absPath),
+      () => this._onFileChangeComplete(absPath)
+    );
+  }
+
+  _onFileChangeComplete(absPath) {
     // Make sure the file watcher event runs through the system before
     // we rebuild the bundles.
     this._debouncedFileChangeHandler(absPath);
   }
 
-  _rebuildBundles() {
-    const buildBundle = this.buildBundle.bind(this);
-    const bundles = this._bundles;
-
-    Object.keys(bundles).forEach(function(optionsJson) {
-      const options = JSON.parse(optionsJson);
-      // Wait for a previous build (if exists) to finish.
-      bundles[optionsJson] = (bundles[optionsJson] || Promise.resolve()).finally(function() {
-        // With finally promise callback we can't change the state of the promise
-        // so we need to reassign the promise.
-        bundles[optionsJson] = buildBundle(options).then(function(p) {
-          // Make a throwaway call to getSource to cache the source string.
-          p.getSource({
-            inlineSourceMap: options.inlineSourceMap,
-            minify: options.minify,
-            dev: options.dev,
-          });
-          return p;
-        });
-      });
-      return bundles[optionsJson];
-    });
+  _clearBundles() {
+    this._bundles = Object.create(null);
   }
 
   _informChangeWatchers() {
@@ -316,12 +347,11 @@ class Server {
   }
 
   _processDebugRequest(reqUrl, res) {
-    var ret = '<!doctype html>';
+    let ret = '<!doctype html>';
     const pathname = url.parse(reqUrl).pathname;
     const parts = pathname.split('/').filter(Boolean);
     if (parts.length === 1) {
       ret += '<div><a href="/debug/bundles">Cached Bundles</a></div>';
-      ret += '<div><a href="/debug/graph">Dependency Graph</a></div>';
       res.end(ret);
     } else if (parts[1] === 'bundles') {
       ret += '<h1> Cached Bundles </h1>';
@@ -335,13 +365,9 @@ class Server {
         e => {
           res.writeHead(500);
           res.end('Internal Error');
-          console.log(e.stack);
+          console.log(e.stack); // eslint-disable-line no-console-disallow
         }
       );
-    } else if (parts[1] === 'graph'){
-      ret += '<h1> Dependency Graph </h2>';
-      ret += this._bundler.getGraphDebugInfo();
-      res.end(ret);
     } else {
       res.writeHead('404');
       res.end('Invalid debug request');
@@ -367,13 +393,33 @@ class Server {
     });
   }
 
+  _rangeRequestMiddleware(req, res, data, assetPath) {
+    if (req.headers && req.headers.range) {
+      const [rangeStart, rangeEnd] = req.headers.range.replace(/bytes=/, '').split('-');
+      const dataStart = parseInt(rangeStart, 10);
+      const dataEnd = rangeEnd ? parseInt(rangeEnd, 10) : data.length - 1;
+      const chunksize = (dataEnd - dataStart) + 1;
+
+      res.writeHead(206, {
+        'Accept-Ranges': 'bytes',
+        'Content-Length': chunksize,
+        'Content-Range': `bytes ${dataStart}-${dataEnd}/${data.length}`,
+        'Content-Type': mime.lookup(path.basename(assetPath[1]))
+      });
+
+      return data.slice(dataStart, dataEnd);
+    }
+
+    return data;
+  }
+
   _processAssetsRequest(req, res) {
     const urlObj = url.parse(req.url, true);
     const assetPath = urlObj.pathname.match(/^\/assets\/(.+)$/);
     const assetEvent = Activity.startEvent(`processing asset request ${assetPath[1]}`);
     this._assetServer.get(assetPath[1], urlObj.query.platform)
       .then(
-        data => res.end(data),
+        data => res.end(this._rangeRequestMiddleware(req, res, data, assetPath)),
         error => {
           console.error(error.stack);
           res.writeHead('404');
@@ -384,9 +430,9 @@ class Server {
 
   processRequest(req, res, next) {
     const urlObj = url.parse(req.url, true);
-    var pathname = urlObj.pathname;
+    const pathname = urlObj.pathname;
 
-    var requestType;
+    let requestType;
     if (pathname.match(/\.bundle$/)) {
       requestType = 'bundle';
     } else if (pathname.match(/\.map$/)) {
@@ -402,6 +448,9 @@ class Server {
     } else if (pathname.match(/^\/assets\//)) {
       this._processAssetsRequest(req, res);
       return;
+    } else if (pathname === '/symbolicate') {
+      this._symbolicate(req, res);
+      return;
     } else {
       next();
       return;
@@ -416,24 +465,22 @@ class Server {
     building.then(
       p => {
         if (requestType === 'bundle') {
-          var bundleSource = p.getSource({
+          const bundleSource = p.getSource({
             inlineSourceMap: options.inlineSourceMap,
             minify: options.minify,
             dev: options.dev,
           });
           res.setHeader('Content-Type', 'application/javascript');
-          
           res.setHeader('ETag', p.getEtag());
-          if (req.headers['if-none-match'] === res.getHeader('ETag')) {
+          if (req.headers['if-none-match'] === res.getHeader('ETag')){
             res.statusCode = 304;
             res.end();
           } else {
             res.end(bundleSource);
           }
-          
           Activity.endEvent(startReqEventId);
         } else if (requestType === 'map') {
-          var sourceMap = p.getSourceMap({
+          let sourceMap = p.getSourceMap({
             minify: options.minify,
             dev: options.dev,
           });
@@ -446,7 +493,7 @@ class Server {
           res.end(sourceMap);
           Activity.endEvent(startReqEventId);
         } else if (requestType === 'assets') {
-          var assetsList = JSON.stringify(p.getAssets());
+          const assetsList = JSON.stringify(p.getAssets());
           res.setHeader('Content-Type', 'application/json');
           res.end(assetsList);
           Activity.endEvent(startReqEventId);
@@ -454,6 +501,79 @@ class Server {
       },
       this._handleError.bind(this, res, optionsJson)
     ).done();
+  }
+
+  _symbolicate(req, res) {
+    const startReqEventId = Activity.startEvent('symbolicate');
+    new Promise.resolve(req.rawBody).then(body => {
+      const stack = JSON.parse(body).stack;
+
+      // In case of multiple bundles / HMR, some stack frames can have
+      // different URLs from others
+      const urlIndexes = {};
+      const uniqueUrls = [];
+      stack.forEach(frame => {
+        const sourceUrl = frame.file;
+        // Skip `/debuggerWorker.js` which drives remote debugging because it
+        // does not need to symbolication.
+        // Skip anything except http(s), because there is no support for that yet
+        if (!urlIndexes.hasOwnProperty(sourceUrl) &&
+            !sourceUrl.endsWith('/debuggerWorker.js') &&
+            sourceUrl.startsWith('http')) {
+          urlIndexes[sourceUrl] = uniqueUrls.length;
+          uniqueUrls.push(sourceUrl);
+        }
+      });
+
+      const sourceMaps = uniqueUrls.map(
+        sourceUrl => this._sourceMapForURL(sourceUrl)
+      );
+      return Promise.all(sourceMaps).then(consumers => {
+        return stack.map(frame => {
+          const sourceUrl = frame.file;
+          if (!urlIndexes.hasOwnProperty(sourceUrl)) {
+            return frame;
+          }
+          const idx = urlIndexes[sourceUrl];
+          const consumer = consumers[idx];
+          const original = consumer.originalPositionFor({
+            line: frame.lineNumber,
+            column: frame.column,
+          });
+          if (!original) {
+            return frame;
+          }
+          return Object.assign({}, frame, {
+            file: original.source,
+            lineNumber: original.line,
+            column: original.column,
+          });
+        });
+      });
+    }).then(
+      stack => res.end(JSON.stringify({stack: stack})),
+      error => {
+        console.error(error.stack || error);
+        res.statusCode = 500;
+        res.end(JSON.stringify({error: error.message}));
+      }
+    ).done(() => {
+      Activity.endEvent(startReqEventId);
+    });
+  }
+
+  _sourceMapForURL(reqUrl) {
+    const options = this._getOptionsFromUrl(reqUrl);
+    const optionsJson = JSON.stringify(options);
+    const building = this._bundles[optionsJson] || this.buildBundle(options);
+    this._bundles[optionsJson] = building;
+    return building.then(p => {
+      const sourceMap = p.getSourceMap({
+        minify: options.minify,
+        dev: options.dev,
+      });
+      return new SourceMapConsumer(sourceMap);
+    });
   }
 
   _handleError(res, bundleID, error) {
@@ -502,7 +622,7 @@ class Server {
       return true;
     }).join('.') + '.js';
 
-    const sourceMapUrlObj = _.clone(urlObj);
+    const sourceMapUrlObj = Object.assign({}, urlObj);
     sourceMapUrlObj.pathname = pathname.replace(/\.bundle$/, '.map');
 
     // try to get the platform from the url
@@ -522,6 +642,11 @@ class Server {
         false
       ),
       platform: platform,
+      entryModuleOnly: this._getBoolOptionFromQuery(
+        urlObj.query,
+        'entryModuleOnly',
+        false,
+      ),
     };
   }
 

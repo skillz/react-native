@@ -13,7 +13,7 @@
 
 var ReactNativeStyleAttributes = require('ReactNativeStyleAttributes');
 
-export type ComponentInterface = ReactClass<any, any, any> | {
+export type ComponentInterface = ReactClass<any> | {
   name?: string;
   displayName?: string;
   propTypes: Object;
@@ -27,9 +27,11 @@ function verifyPropTypes(
   if (!viewConfig) {
     return; // This happens for UnimplementedView.
   }
-  var componentName = componentInterface.name ||
+  var componentName =
     componentInterface.displayName ||
+    componentInterface.name ||
     'unknown';
+
   if (!componentInterface.propTypes) {
     throw new Error(
       '`' + componentName + '` has no propTypes defined`'
@@ -49,7 +51,10 @@ function verifyPropTypes(
         message = '`' + componentName + '` has no propType for native prop `' +
         viewConfig.uiViewClassName + '.' + prop + '` of native type `' +
         nativeProps[prop] + '`';
-      };
+      }
+      message += '\nIf you haven\'t changed this prop yourself, this usually means that ' +
+        'your versions of the native code and JavaScript code are out of sync. Updating both ' +
+        'should make this error go away.';
       throw new Error(message);
     }
   }

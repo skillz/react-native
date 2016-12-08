@@ -14,7 +14,7 @@
 var MatrixMath = require('MatrixMath');
 var Platform = require('Platform');
 
-var invariant = require('invariant');
+var invariant = require('fbjs/lib/invariant');
 var stringifySafe = require('stringifySafe');
 
 /**
@@ -81,13 +81,6 @@ function processTransform(transform: Object): Object {
     }
   });
 
-  // Android does not support the direct application of a transform matrix to
-  // a view, so we need to decompose the result matrix into transforms that can
-  // get applied in the specific order of (1) translate (2) scale (3) rotate.
-  // Once we can directly apply a matrix, we can remove this decomposition.
-  if (Platform.OS === 'android') {
-    return MatrixMath.decomposeMatrix(result);
-  }
   return result;
 }
 
@@ -162,6 +155,20 @@ function _validateTransform(key, value, transformation) {
         value.indexOf('deg') > -1 || value.indexOf('rad') > -1,
         'Rotate transform must be expressed in degrees (deg) or radians ' +
           '(rad): %s',
+        stringifySafe(transformation),
+      );
+      break;
+    case 'perspective':
+      invariant(
+        typeof value === 'number',
+        'Transform with key of "%s" must be a number: %s',
+        key,
+        stringifySafe(transformation),
+      );
+      invariant(
+        value !== 0,
+        'Transform with key of "%s" cannot be zero: %s',
+        key,
         stringifySafe(transformation),
       );
       break;

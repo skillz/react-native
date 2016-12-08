@@ -118,8 +118,48 @@ RCT_CUSTOM_CONVERTER(NSData *, NSData, [json dataUsingEncoding:NSUTF8StringEncod
 
 + (NSURLRequest *)NSURLRequest:(id)json
 {
-  NSURL *URL = [self NSURL:json];
-  return URL ? [NSURLRequest requestWithURL:URL] : nil;
+  if ([json isKindOfClass:[NSString class]]) {
+    NSURL *URL = [self NSURL:json];
+    return URL ? [NSURLRequest requestWithURL:URL] : nil;
+  }
+  if ([json isKindOfClass:[NSDictionary class]]) {
+    NSURL *URL = [self NSURL:json[@"uri"] ?: json[@"url"]];
+    if (!URL) {
+      return nil;
+    }
+    NSData *body = [self NSData:json[@"body"]];
+    NSString *method = [self NSString:json[@"method"]].uppercaseString ?: @"GET";
+    NSDictionary *headers = [self NSDictionary:json[@"headers"]];
+    if ([method isEqualToString:@"GET"] && headers == nil && body == nil) {
+      return [NSURLRequest requestWithURL:URL];
+    }
+
+    if (headers) {
+      __block BOOL allHeadersAreStrings = YES;
+      [headers enumerateKeysAndObjectsUsingBlock:^(NSString *key, id header, BOOL *stop) {
+        if (![header isKindOfClass:[NSString class]]) {
+          RCTLogError(@"Values of HTTP headers passed must be  of type string. "
+                      "Value of header '%@' is not a string.", key);
+          allHeadersAreStrings = NO;
+          *stop = YES;
+        }
+      }];
+      if (!allHeadersAreStrings) {
+        // Set headers to nil here to avoid crashing later.
+        headers = nil;
+      }
+    }
+
+    NSMutableURLRequest *request = [NSMutableURLRequest requestWithURL:URL];
+    request.HTTPBody = body;
+    request.HTTPMethod = method;
+    request.allHTTPHeaderFields = headers;
+    return [request copy];
+  }
+  if (json) {
+    RCTLogConvertError(json, @"a valid URLRequest");
+  }
+  return nil;
 }
 
 + (RCTFileURL *)RCTFileURL:(id)json
@@ -208,13 +248,12 @@ NSNumber *RCTConvertMultiEnumValue(const char *typeName, NSDictionary *mapping, 
 }
 
 RCT_ENUM_CONVERTER(NSLineBreakMode, (@{
+  @"clip": @(NSLineBreakByClipping),
+  @"head": @(NSLineBreakByTruncatingHead),
+  @"tail": @(NSLineBreakByTruncatingTail),
+  @"middle": @(NSLineBreakByTruncatingMiddle),
   @"wordWrapping": @(NSLineBreakByWordWrapping),
-  @"charWrapping": @(NSLineBreakByCharWrapping),
-  @"clipping": @(NSLineBreakByClipping),
-  @"truncatingHead": @(NSLineBreakByTruncatingHead),
-  @"truncatingTail": @(NSLineBreakByTruncatingTail),
-  @"truncatingMiddle": @(NSLineBreakByTruncatingMiddle),
-}), NSLineBreakByWordWrapping, integerValue)
+}), NSLineBreakByTruncatingTail, integerValue)
 
 RCT_ENUM_CONVERTER(NSTextAlignment, (@{
   @"auto": @(NSTextAlignmentNatural),
@@ -279,6 +318,15 @@ RCT_ENUM_CONVERTER(UIKeyboardType, (@{
   // Added for Android compatibility
   @"numeric": @(UIKeyboardTypeDecimalPad),
 }), UIKeyboardTypeDefault, integerValue)
+
+RCT_MULTI_ENUM_CONVERTER(UIDataDetectorTypes, (@{
+  @"phoneNumber": @(UIDataDetectorTypePhoneNumber),
+  @"link": @(UIDataDetectorTypeLink),
+  @"address": @(UIDataDetectorTypeAddress),
+  @"calendarEvent": @(UIDataDetectorTypeCalendarEvent),
+  @"none": @(UIDataDetectorTypeNone),
+  @"all": @(UIDataDetectorTypeAll),
+}), UIDataDetectorTypePhoneNumber, unsignedLongLongValue)
 
 RCT_ENUM_CONVERTER(UIKeyboardAppearance, (@{
   @"default": @(UIKeyboardAppearanceDefault),
@@ -774,36 +822,38 @@ RCT_ENUM_CONVERTER(css_clip_t, (@{
   @"visible": @NO
 }), NO, boolValue)
 
-RCT_ENUM_CONVERTER(css_flex_direction_t, (@{
-  @"row": @(CSS_FLEX_DIRECTION_ROW),
-  @"column": @(CSS_FLEX_DIRECTION_COLUMN)
-}), CSS_FLEX_DIRECTION_COLUMN, intValue)
+RCT_ENUM_CONVERTER(CSSFlexDirection, (@{
+  @"row": @(CSSFlexDirectionRow),
+  @"row-reverse": @(CSSFlexDirectionRowReverse),
+  @"column": @(CSSFlexDirectionColumn),
+  @"column-reverse": @(CSSFlexDirectionColumnReverse)
+}), CSSFlexDirectionColumn, intValue)
 
-RCT_ENUM_CONVERTER(css_justify_t, (@{
-  @"flex-start": @(CSS_JUSTIFY_FLEX_START),
-  @"flex-end": @(CSS_JUSTIFY_FLEX_END),
-  @"center": @(CSS_JUSTIFY_CENTER),
-  @"space-between": @(CSS_JUSTIFY_SPACE_BETWEEN),
-  @"space-around": @(CSS_JUSTIFY_SPACE_AROUND)
-}), CSS_JUSTIFY_FLEX_START, intValue)
+RCT_ENUM_CONVERTER(CSSJustify, (@{
+  @"flex-start": @(CSSJustifyFlexStart),
+  @"flex-end": @(CSSJustifyFlexEnd),
+  @"center": @(CSSJustifyCenter),
+  @"space-between": @(CSSJustifySpaceBetween),
+  @"space-around": @(CSSJustifySpaceAround)
+}), CSSJustifyFlexStart, intValue)
 
-RCT_ENUM_CONVERTER(css_align_t, (@{
-  @"flex-start": @(CSS_ALIGN_FLEX_START),
-  @"flex-end": @(CSS_ALIGN_FLEX_END),
-  @"center": @(CSS_ALIGN_CENTER),
-  @"auto": @(CSS_ALIGN_AUTO),
-  @"stretch": @(CSS_ALIGN_STRETCH)
-}), CSS_ALIGN_FLEX_START, intValue)
+RCT_ENUM_CONVERTER(CSSAlign, (@{
+  @"flex-start": @(CSSAlignFlexStart),
+  @"flex-end": @(CSSAlignFlexEnd),
+  @"center": @(CSSAlignCenter),
+  @"auto": @(CSSAlignAuto),
+  @"stretch": @(CSSAlignStretch)
+}), CSSAlignFlexStart, intValue)
 
-RCT_ENUM_CONVERTER(css_position_type_t, (@{
-  @"absolute": @(CSS_POSITION_ABSOLUTE),
-  @"relative": @(CSS_POSITION_RELATIVE)
-}), CSS_POSITION_RELATIVE, intValue)
+RCT_ENUM_CONVERTER(CSSPositionType, (@{
+  @"absolute": @(CSSPositionTypeAbsolute),
+  @"relative": @(CSSPositionTypeRelative)
+}), CSSPositionTypeRelative, intValue)
 
-RCT_ENUM_CONVERTER(css_wrap_type_t, (@{
-  @"wrap": @(CSS_WRAP),
-  @"nowrap": @(CSS_NOWRAP)
-}), CSS_NOWRAP, intValue)
+RCT_ENUM_CONVERTER(CSSWrapType, (@{
+  @"wrap": @(CSSWrapTypeWrap),
+  @"nowrap": @(CSSWrapTypeNoWrap)
+}), CSSWrapTypeNoWrap, intValue)
 
 RCT_ENUM_CONVERTER(RCTPointerEvents, (@{
   @"none": @(RCTPointerEventsNone),
@@ -844,7 +894,7 @@ RCT_ENUM_CONVERTER(RCTAnimationType, (@{
   }
 
   __block UIImage *image;
-  if (![NSThread isMainThread]) {
+  if (!RCTIsMainQueue()) {
     // It seems that none of the UIImage loading methods can be guaranteed
     // thread safe, so we'll pick the lesser of two evils here and block rather
     // than run the risk of crashing
@@ -855,11 +905,11 @@ RCT_ENUM_CONVERTER(RCTAnimationType, (@{
     return image;
   }
 
-  NSURL *URL = imageSource.imageURL;
+  NSURL *URL = imageSource.request.URL;
   NSString *scheme = URL.scheme.lowercaseString;
   if ([scheme isEqualToString:@"file"]) {
     NSString *assetName = RCTBundlePathForURL(URL);
-    image = [UIImage imageNamed:assetName];
+    image = assetName ? [UIImage imageNamed:assetName] : nil;
     if (!image) {
       // Attempt to load from the file system
       NSString *filePath = URL.path;
@@ -890,8 +940,10 @@ RCT_ENUM_CONVERTER(RCTAnimationType, (@{
 
   if (!CGSizeEqualToSize(imageSource.size, CGSizeZero) &&
       !CGSizeEqualToSize(imageSource.size, image.size)) {
-    RCTLogError(@"Image source size %@ does not match loaded image size %@.",
-                NSStringFromCGSize(imageSource.size), NSStringFromCGSize(image.size));
+    RCTLogError(@"Image source %@ size %@ does not match loaded image size %@.",
+                URL.path.lastPathComponent,
+                NSStringFromCGSize(imageSource.size),
+                NSStringFromCGSize(image.size));
   }
 
   return image;

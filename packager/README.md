@@ -12,7 +12,7 @@ to wait more than a few seconds after starting the packager.
 
 The main deviation from the node module system is the support for our
 proprietary module format known as `@providesModule`. However, we
-discourage people to use this module format because going forward, we
+discourage people from using this module format because going forward we
 want to completely separate our infrastructure from React Native and
 provide an experience most JavaScript developers are familiar with,
 namely the node module format. We want to even go further, and let you
@@ -72,12 +72,10 @@ Here are the current options the packager accepts:
 
 ### /debug
 
-This is a page used for debugging, it has links to two pages:
+This is a page used for debugging, it offers a link to a single page :
 
 * Cached Packages: which shows you the packages that's been already
   generated and cached
-* Dependency Graph: is the in-memory graph of all the modules and
-  their dependencies
 
 ## Programmatic API
 
@@ -132,9 +130,9 @@ is passed to `ReactPackager.middleware`
 To get verbose output when running the packager, define an environment variable:
 
     export DEBUG=ReactNativePackager:*
-    
+
 You can combine this with other values, e.g. `DEBUG=babel,ReactNativePackager:*`. Under the hood this uses the [`debug`](https://www.npmjs.com/package/debug) package, see its documentation for all the available options.
-    
+
 The `/debug` endpoint discussed above is also useful.
 
 ## FAQ

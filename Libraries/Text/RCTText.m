@@ -13,10 +13,20 @@
 #import "RCTUtils.h"
 #import "UIView+React.h"
 
+static void collectNonTextDescendants(RCTText *view, NSMutableArray *nonTextDescendants)
+{
+  for (UIView *child in view.reactSubviews) {
+    if ([child isKindOfClass:[RCTText class]]) {
+      collectNonTextDescendants((RCTText *)child, nonTextDescendants);
+    } else if (!CGRectEqualToRect(child.frame, CGRectZero)) {
+      [nonTextDescendants addObject:child];
+    }
+  }
+}
+
 @implementation RCTText
 {
   NSTextStorage *_textStorage;
-  NSMutableArray<UIView *> *_reactSubviews;
   CAShapeLayer *_highlightLayer;
 }
 
@@ -24,7 +34,6 @@
 {
   if ((self = [super initWithFrame:frame])) {
     _textStorage = [NSTextStorage new];
-    _reactSubviews = [NSMutableArray array];
 
     self.isAccessibilityElement = YES;
     self.accessibilityTraits |= UIAccessibilityTraitStaticText;
@@ -52,19 +61,38 @@
   }];
 }
 
-- (void)insertReactSubview:(UIView *)subview atIndex:(NSInteger)atIndex
+- (void)reactSetInheritedBackgroundColor:(UIColor *)inheritedBackgroundColor
 {
-  [_reactSubviews insertObject:subview atIndex:atIndex];
+  self.backgroundColor = inheritedBackgroundColor;
 }
 
-- (void)removeReactSubview:(UIView *)subview
+- (void)didUpdateReactSubviews
 {
-  [_reactSubviews removeObject:subview];
+  // Do nothing, as subviews are managed by `setTextStorage:` method
 }
 
-- (NSArray<UIView *> *)reactSubviews
+- (void)setTextStorage:(NSTextStorage *)textStorage
 {
-  return _reactSubviews;
+  if (_textStorage != textStorage) {
+    _textStorage = textStorage;
+
+    // Update subviews
+    NSMutableArray *nonTextDescendants = [NSMutableArray new];
+    collectNonTextDescendants(self, nonTextDescendants);
+    NSArray *subviews = self.subviews;
+    if (![subviews isEqualToArray:nonTextDescendants]) {
+      for (UIView *child in subviews) {
+        if (![nonTextDescendants containsObject:child]) {
+          [child removeFromSuperview];
+        }
+      }
+      for (UIView *child in nonTextDescendants) {
+        [self addSubview:child];
+      }
+    }
+
+    [self setNeedsDisplay];
+  }
 }
 
 - (void)drawRect:(CGRect)rect

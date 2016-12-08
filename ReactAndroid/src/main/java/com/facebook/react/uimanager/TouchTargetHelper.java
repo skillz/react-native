@@ -13,12 +13,14 @@ import javax.annotation.Nullable;
 
 import android.graphics.Matrix;
 import android.graphics.PointF;
+import android.graphics.Rect;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
 
 import com.facebook.react.bridge.JSApplicationIllegalArgumentException;
 import com.facebook.react.bridge.UiThreadUtil;
+import com.facebook.react.touch.ReactHitSlopView;
 
 /**
  * Class responsible for identifying which react view should handle a given {@link MotionEvent}.
@@ -44,7 +46,27 @@ public class TouchTargetHelper {
       float eventX,
       float eventY,
       ViewGroup viewGroup) {
-    return findTargetTagAndCoordinatesForTouch(eventX, eventY, viewGroup, mEventCoords);
+    return findTargetTagAndCoordinatesForTouch(
+        eventX, eventY, viewGroup, mEventCoords, null);
+  }
+
+  /**
+   * Find touch event target view within the provided container given the coordinates provided
+   * via {@link MotionEvent}.
+   *
+   * @param eventX the X screen coordinate of the touch location
+   * @param eventY the Y screen coordinate of the touch location
+   * @param viewGroup the container view to traverse
+   * @param nativeViewId the native react view containing this touch target
+   * @return the react tag ID of the child view that should handle the event
+   */
+  public static int findTargetTagForTouch(
+      float eventX,
+      float eventY,
+      ViewGroup viewGroup,
+      @Nullable int[] nativeViewId) {
+    return findTargetTagAndCoordinatesForTouch(
+        eventX, eventY, viewGroup, mEventCoords, nativeViewId);
   }
 
   /**
@@ -55,13 +77,15 @@ public class TouchTargetHelper {
    * @param eventY the Y screen coordinate of the touch location
    * @param viewGroup the container view to traverse
    * @param viewCoords an out parameter that will return the X,Y value in the target view
+   * @param nativeViewTag an out parameter that will return the native view id
    * @return the react tag ID of the child view that should handle the event
    */
   public static int findTargetTagAndCoordinatesForTouch(
       float eventX,
       float eventY,
       ViewGroup viewGroup,
-      float[] viewCoords) {
+      float[] viewCoords,
+      @Nullable int[] nativeViewTag) {
     UiThreadUtil.assertOnUiThread();
     int targetTag = viewGroup.getId();
     // Store eventCoords in array so that they are modified to be relative to the targetView found.
@@ -71,6 +95,9 @@ public class TouchTargetHelper {
     if (nativeTargetView != null) {
       View reactTargetView = findClosestReactAncestor(nativeTargetView);
       if (reactTargetView != null) {
+        if (nativeViewTag != null) {
+          nativeViewTag[0] = reactTargetView.getId();
+        }
         targetTag = getTouchTargetForView(reactTargetView, viewCoords[0], viewCoords[1]);
       }
     }
@@ -118,7 +145,7 @@ public class TouchTargetHelper {
       }
     }
     return viewGroup;
-}
+  }
 
   /**
    * Returns whether the touch point is within the child View
@@ -144,12 +171,24 @@ public class TouchTargetHelper {
       localX = localXY[0];
       localY = localXY[1];
     }
-    if ((localX >= 0 && localX < (child.getRight() - child.getLeft()))
-        && (localY >= 0 && localY < (child.getBottom() - child.getTop()))) {
-      outLocalPoint.set(localX, localY);
-      return true;
+    if (child instanceof ReactHitSlopView && ((ReactHitSlopView) child).getHitSlopRect() != null) {
+      Rect hitSlopRect = ((ReactHitSlopView) child).getHitSlopRect();
+      if ((localX >= -hitSlopRect.left && localX < (child.getRight() - child.getLeft()) + hitSlopRect.right)
+          && (localY >= -hitSlopRect.top && localY < (child.getBottom() - child.getTop()) + hitSlopRect.bottom)) {
+        outLocalPoint.set(localX, localY);
+        return true;
+      }
+
+      return false;
+    } else {
+      if ((localX >= 0 && localX < (child.getRight() - child.getLeft()))
+          && (localY >= 0 && localY < (child.getBottom() - child.getTop()))) {
+        outLocalPoint.set(localX, localY);
+        return true;
+      }
+
+      return false;
     }
-    return false;
   }
 
 
@@ -195,6 +234,11 @@ public class TouchTargetHelper {
 
     } else if (pointerEvents == PointerEvents.AUTO) {
       // Either this view or one of its children is the target
+      if (view instanceof ReactCompoundViewGroup) {
+        if (((ReactCompoundViewGroup) view).interceptsTouchEvent(eventCoords[0], eventCoords[1])) {
+          return view;
+        }
+      }
       if (view instanceof ViewGroup) {
         return findTouchTargetView(eventCoords, (ViewGroup) view);
       }

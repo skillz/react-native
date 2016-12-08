@@ -11,9 +11,9 @@ package com.facebook.react.bridge.queue;
 
 import java.util.concurrent.Callable;
 import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
 
 import android.os.Looper;
+import android.os.Process;
 
 import com.facebook.common.logging.FLog;
 import com.facebook.proguard.annotations.DoNotStrip;
@@ -83,6 +83,7 @@ public class MessageQueueThreadImpl implements MessageQueueThread {
   /**
    * @return whether the current Thread is also the Thread associated with this MessageQueueThread.
    */
+  @DoNotStrip
   @Override
   public boolean isOnThread() {
     return mLooper.getThread() == Thread.currentThread();
@@ -92,6 +93,7 @@ public class MessageQueueThreadImpl implements MessageQueueThread {
    * Asserts {@link #isOnThread()}, throwing a {@link AssertionException} (NOT an
    * {@link AssertionError}) if the assertion fails.
    */
+  @DoNotStrip
   @Override
   public void assertIsOnThread() {
     SoftAssertions.assertCondition(isOnThread(), mAssertionErrorMessage);
@@ -101,6 +103,8 @@ public class MessageQueueThreadImpl implements MessageQueueThread {
    * Quits this queue's Looper. If that Looper was running on a different Thread than the current
    * Thread, also waits for the last message being processed to finish and the Thread to die.
    */
+  @DoNotStrip
+  @Override
   public void quitSynchronous() {
     mIsFinished = true;
     mLooper.quit();
@@ -128,7 +132,7 @@ public class MessageQueueThreadImpl implements MessageQueueThread {
       case MAIN_UI:
         return createForMainThread(spec.getName(), exceptionHandler);
       case NEW_BACKGROUND:
-        return startNewBackgroundThread(spec.getName(), exceptionHandler);
+        return startNewBackgroundThread(spec.getName(), spec.getStackSize(), exceptionHandler);
       default:
         throw new RuntimeException("Unknown thread type: " + spec.getThreadType());
     }
@@ -144,49 +148,57 @@ public class MessageQueueThreadImpl implements MessageQueueThread {
     final MessageQueueThreadImpl mqt =
         new MessageQueueThreadImpl(name, mainLooper, exceptionHandler);
 
-    // Ensure that the MQT is registered by the time this method returns
     if (UiThreadUtil.isOnUiThread()) {
+      Process.setThreadPriority(Process.THREAD_PRIORITY_DISPLAY);
       MessageQueueThreadRegistry.register(mqt);
     } else {
-      final SimpleSettableFuture<Void> registrationFuture = new SimpleSettableFuture<>();
       UiThreadUtil.runOnUiThread(
           new Runnable() {
             @Override
             public void run() {
+              Process.setThreadPriority(Process.THREAD_PRIORITY_DISPLAY);
               MessageQueueThreadRegistry.register(mqt);
-              registrationFuture.set(null);
             }
           });
-      registrationFuture.getOrThrow(5000, TimeUnit.MILLISECONDS);
     }
     return mqt;
   }
 
-  /**
-   * Creates  and starts a new MessageQueueThreadImpl encapsulating a new Thread with a new Looper
-   * running on it. Give it a name for easier debugging. When this method exits, the new
-   * MessageQueueThreadImpl is ready to receive events.
-   */
   public static MessageQueueThreadImpl startNewBackgroundThread(
       final String name,
       QueueThreadExceptionHandler exceptionHandler) {
+    return startNewBackgroundThread(
+        name,
+        MessageQueueThreadSpec.DEFAULT_STACK_SIZE_BYTES,
+        exceptionHandler);
+  }
+
+  /**
+   * Creates and starts a new MessageQueueThreadImpl encapsulating a new Thread with a new Looper
+   * running on it. Give it a name for easier debugging and optionally a suggested stack size.
+   * When this method exits, the new MessageQueueThreadImpl is ready to receive events.
+   */
+  public static MessageQueueThreadImpl startNewBackgroundThread(
+      final String name,
+      long stackSize,
+      QueueThreadExceptionHandler exceptionHandler) {
     final SimpleSettableFuture<Looper> looperFuture = new SimpleSettableFuture<>();
     final SimpleSettableFuture<MessageQueueThread> mqtFuture = new SimpleSettableFuture<>();
-    Thread bgThread = new Thread(
+    Thread bgThread = new Thread(null,
         new Runnable() {
           @Override
           public void run() {
             Looper.prepare();
 
             looperFuture.set(Looper.myLooper());
-            MessageQueueThreadRegistry.register(mqtFuture.getOrThrow(5000, TimeUnit.MILLISECONDS));
+            MessageQueueThreadRegistry.register(mqtFuture.getOrThrow());
 
             Looper.loop();
           }
-        }, "mqt_" + name);
+        }, "mqt_" + name, stackSize);
     bgThread.start();
 
-    Looper myLooper = looperFuture.getOrThrow(5000, TimeUnit.MILLISECONDS);
+    Looper myLooper = looperFuture.getOrThrow();
     MessageQueueThreadImpl mqt = new MessageQueueThreadImpl(name, myLooper, exceptionHandler);
     mqtFuture.set(mqt);
 

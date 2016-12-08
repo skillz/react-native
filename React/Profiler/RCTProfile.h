@@ -10,6 +10,7 @@
 #import <Foundation/Foundation.h>
 
 #import "RCTDefines.h"
+#import "RCTAssert.h"
 
 /**
  * RCTProfile
@@ -23,7 +24,9 @@
 RCT_EXTERN NSString *const RCTProfileDidStartProfiling;
 RCT_EXTERN NSString *const RCTProfileDidEndProfiling;
 
-#if RCT_DEV
+RCT_EXTERN const uint64_t RCTProfileTagAlways;
+
+#if RCT_PROFILE
 
 @class RCTBridge;
 
@@ -69,11 +72,9 @@ RCT_EXTERN void _RCTProfileBeginEvent(NSThread *calleeThread,
 #define RCT_PROFILE_BEGIN_EVENT(...) \
   do { \
     if (RCTProfileIsProfiling()) { \
-      NSThread *calleeThread = [NSThread currentThread]; \
-      NSTimeInterval time = CACurrentMediaTime(); \
-      dispatch_async(RCTProfileGetQueue(), ^{ \
-        _RCTProfileBeginEvent(calleeThread, time, __VA_ARGS__); \
-      }); \
+      NSThread *__calleeThread = [NSThread currentThread]; \
+      NSTimeInterval __time = CACurrentMediaTime(); \
+      _RCTProfileBeginEvent(__calleeThread, __time, __VA_ARGS__); \
     } \
   } while(0)
 
@@ -92,12 +93,10 @@ RCT_EXTERN void _RCTProfileEndEvent(NSThread *calleeThread,
 #define RCT_PROFILE_END_EVENT(...) \
   do { \
     if (RCTProfileIsProfiling()) { \
-      NSThread *calleeThread = [NSThread currentThread]; \
-      NSString *threadName = RCTCurrentThreadName(); \
-      NSTimeInterval time = CACurrentMediaTime(); \
-      dispatch_async(RCTProfileGetQueue(), ^{ \
-        _RCTProfileEndEvent(calleeThread, threadName, time, __VA_ARGS__); \
-      }); \
+      NSThread *__calleeThread = [NSThread currentThread]; \
+      NSString *__threadName = RCTCurrentThreadName(); \
+      NSTimeInterval __time = CACurrentMediaTime(); \
+      _RCTProfileEndEvent(__calleeThread, __threadName, __time, __VA_ARGS__); \
     } \
   } while(0)
 
@@ -117,6 +116,7 @@ RCT_EXTERN void RCTProfileEndAsyncEvent(uint64_t tag,
                                         NSString *category,
                                         NSUInteger cookie,
                                         NSString *name,
+                                        NSString *threadName,
                                         NSDictionary *args);
 
 /**
@@ -132,6 +132,8 @@ RCT_EXTERN void RCTProfileImmediateEvent(uint64_t tag,
  * self and _cmd to name this event for simplicity sake.
  *
  * NOTE: The block can't expect any argument
+ *
+ * DEPRECATED: this approach breaks debugging and stepping through instrumented block functions
  */
 #define RCTProfileBlock(block, tag, category, arguments) \
 ^{ \
@@ -149,6 +151,11 @@ RCT_EXTERN void RCTProfileHookModules(RCTBridge *);
  * Unhook from a given bridge instance's modules
  */
 RCT_EXTERN void RCTProfileUnhookModules(RCTBridge *);
+
+/**
+ * Hook into all of a module's methods
+ */
+RCT_EXTERN void RCTProfileHookInstance(id instance);
 
 /**
  * Send systrace or cpu profiling information to the packager
@@ -180,9 +187,18 @@ typedef struct {
   void (*end_async_section)(uint64_t tag, const char *name, int cookie, size_t numArgs, systrace_arg_t *args);
 
   void (*instant_section)(uint64_t tag, const char *name, char scope);
+
+  void (*begin_async_flow)(uint64_t tag, const char *name, int cookie);
+  void (*end_async_flow)(uint64_t tag, const char *name, int cookie);
 } RCTProfileCallbacks;
 
 RCT_EXTERN void RCTProfileRegisterCallbacks(RCTProfileCallbacks *);
+
+/**
+ * Systrace control window
+ */
+RCT_EXTERN void RCTProfileShowControls(void);
+RCT_EXTERN void RCTProfileHideControls(void);
 
 #else
 
@@ -190,7 +206,7 @@ RCT_EXTERN void RCTProfileRegisterCallbacks(RCTProfileCallbacks *);
 #define _RCTProfileBeginFlowEvent() @0
 
 #define RCTProfileEndFlowEvent()
-#define _RCTProfileEndFlowEvent()
+#define _RCTProfileEndFlowEvent(...)
 
 #define RCTProfileIsProfiling(...) NO
 #define RCTProfileInit(...)
@@ -210,8 +226,12 @@ RCT_EXTERN void RCTProfileRegisterCallbacks(RCTProfileCallbacks *);
 #define RCTProfileBlock(block, ...) block
 
 #define RCTProfileHookModules(...)
+#define RCTProfileHookInstance(...)
 #define RCTProfileUnhookModules(...)
 
 #define RCTProfileSendResult(...)
+
+#define RCTProfileShowControls(...)
+#define RCTProfileHideControls(...)
 
 #endif

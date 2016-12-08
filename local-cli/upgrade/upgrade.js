@@ -15,7 +15,7 @@ const Promise = require('promise');
 const yeoman = require('yeoman-environment');
 const semver = require('semver');
 
-module.exports = function upgrade(args, config) {
+function upgrade(args, config) {
   args = args || process.argv;
   const env = yeoman.createEnv();
   const pak = JSON.parse(fs.readFileSync('package.json', 'utf8'));
@@ -44,10 +44,34 @@ module.exports = function upgrade(args, config) {
               'https://github.com/facebook/react-native/releases/tag/v' + semver.major(v) + '.' + semver.minor(v) + '.0'
             )
           );
+
+          // >= v0.21.0, we require react to be a peer dependency
+          if (semver.gte(v, '0.21.0') && !pak.dependencies.react) {
+            console.log(
+              chalk.yellow(
+                '\nYour \'package.json\' file doesn\'t seem to have \'react\' as a dependency.\n' +
+                '\'react\' was changed from a dependency to a peer dependency in react-native v0.21.0.\n' +
+                'Therefore, it\'s necessary to include \'react\' in your project\'s dependencies.\n' +
+                'Just run \'npm install --save react\', then re-run \'react-native upgrade\'.\n'
+              )
+            );
+            return;
+          }
+
+          if (semver.satisfies(v, '~0.26.0')) {
+            console.log(
+              chalk.yellow(
+                'React Native 0.26 introduced some breaking changes to the native files on iOS. You can\n' +
+                'perform them manually by checking the release notes or use \'rnpm\' to do it automatically.\n' +
+                'Just run:\n' +
+                '\'npm install -g rnpm && npm install rnpm-plugin-upgrade@0.26 --save-dev\', then run \'rnpm upgrade\''
+              )
+            );
+          }
         } else {
           console.log(
             chalk.yellow(
-              'A valid version number for \'react-native\' is not specified your \'package.json\' file.'
+              'A valid version number for \'react-native\' is not specified in your \'package.json\' file.'
             )
           );
         }
@@ -72,4 +96,11 @@ module.exports = function upgrade(args, config) {
   env.register(generatorPath, 'react:app');
   const generatorArgs = ['react:app', pak.name].concat(args);
   return new Promise((resolve) => env.run(generatorArgs, {upgrade: true}, resolve));
+}
+
+module.exports = {
+  name: 'upgrade',
+  description: 'upgrade your app\'s template files to the latest version; run this after ' +
+    'updating the react-native version in your package.json and running npm install',
+  func: upgrade,
 };

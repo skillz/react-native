@@ -16,9 +16,13 @@ import java.util.List;
 import com.facebook.react.bridge.JavaScriptModule;
 import com.facebook.react.bridge.NativeModule;
 import com.facebook.react.bridge.ReactApplicationContext;
+import com.facebook.react.common.build.ReactBuildConfig;
+import com.facebook.react.devsupport.JSCHeapCapture;
+import com.facebook.react.devsupport.JSCSamplingProfiler;
 import com.facebook.react.modules.core.DefaultHardwareBackBtnHandler;
 import com.facebook.react.modules.core.DeviceEventManagerModule;
 import com.facebook.react.modules.core.ExceptionsManagerModule;
+import com.facebook.react.devsupport.HMRClient;
 import com.facebook.react.modules.core.JSTimersExecution;
 import com.facebook.react.modules.core.RCTNativeAppEventEmitter;
 import com.facebook.react.modules.core.Timing;
@@ -71,31 +75,44 @@ import com.facebook.systrace.Systrace;
       Systrace.endSection(Systrace.TRACE_TAG_REACT_JAVA_BRIDGE);
     }
 
-    return Arrays.<NativeModule>asList(
+    List<NativeModule> nativeModulesList = new ArrayList<>(Arrays.<NativeModule>asList(
         new AnimationsDebugModule(
             catalystApplicationContext,
             mReactInstanceManager.getDevSupportManager().getDevSettings()),
         new AndroidInfoModule(),
         new DeviceEventManagerModule(catalystApplicationContext, mHardwareBackBtnHandler),
         new ExceptionsManagerModule(mReactInstanceManager.getDevSupportManager()),
-        new Timing(catalystApplicationContext),
-        new SourceCodeModule(
-            mReactInstanceManager.getSourceUrl(),
-            mReactInstanceManager.getDevSupportManager().getSourceMapUrl()),
+        new Timing(catalystApplicationContext, mReactInstanceManager.getDevSupportManager()),
+        new SourceCodeModule(mReactInstanceManager.getSourceUrl()),
         uiManagerModule,
-        new DebugComponentOwnershipModule(catalystApplicationContext));
+        new JSCSamplingProfiler(catalystApplicationContext),
+        new DebugComponentOwnershipModule(catalystApplicationContext)));
+
+    if (ReactBuildConfig.DEBUG) {
+      nativeModulesList.add(new JSCHeapCapture(catalystApplicationContext));
+    }
+
+    return nativeModulesList;
   }
 
   @Override
   public List<Class<? extends JavaScriptModule>> createJSModules() {
-    return Arrays.asList(
+    List<Class<? extends JavaScriptModule>> jsModules = new ArrayList<>(Arrays.asList(
         DeviceEventManagerModule.RCTDeviceEventEmitter.class,
         JSTimersExecution.class,
         RCTEventEmitter.class,
         RCTNativeAppEventEmitter.class,
         AppRegistry.class,
         com.facebook.react.bridge.Systrace.class,
-        DebugComponentOwnershipModule.RCTDebugComponentOwnership.class);
+        HMRClient.class,
+        JSCSamplingProfiler.SamplingProfiler.class,
+        DebugComponentOwnershipModule.RCTDebugComponentOwnership.class));
+
+    if (ReactBuildConfig.DEBUG) {
+      jsModules.add(JSCHeapCapture.HeapCapture.class);
+    }
+
+    return jsModules;
   }
 
   @Override
