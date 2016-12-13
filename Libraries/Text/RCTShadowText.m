@@ -42,7 +42,6 @@ static CSSSize RCTMeasure(void *context, float width, CSSMeasureMode widthMode, 
 {
   RCTShadowText *shadowText = (__bridge RCTShadowText *)context;
   NSTextStorage *textStorage = [shadowText buildTextStorageForWidth:width widthMode:widthMode];
-  [shadowText calculateTextFrame:textStorage];
   NSLayoutManager *layoutManager = textStorage.layoutManagers.firstObject;
   NSTextContainer *textContainer = layoutManager.textContainers.firstObject;
   CGSize computedSize = [layoutManager usedRectForTextContainer:textContainer].size;
