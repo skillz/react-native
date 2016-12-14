@@ -651,7 +651,6 @@ RCT_TEXT_PROPERTY(Opacity, _opacity, CGFloat)
 RCT_TEXT_PROPERTY(TextShadowOffset, _textShadowOffset, CGSize);
 RCT_TEXT_PROPERTY(TextShadowRadius, _textShadowRadius, CGFloat);
 RCT_TEXT_PROPERTY(TextShadowColor, _textShadowColor, UIColor *);
-RCT_TEXT_PROPERTY(AdjustsFontSizeToFit, _adjustsFontSizeToFit, BOOL)
 
 - (void)setAllowFontScaling:(BOOL)allowFontScaling
 {
