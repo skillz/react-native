@@ -496,6 +496,7 @@ RCT_NOT_IMPLEMENTED(- (instancetype)init)
     NSLog(@"SecRandomCopyBytes Failed %s", strerror(errno));
   }
 
+  assert(result == 0);
   _secKey = [keyBytes base64EncodedStringWithOptions:0];
   assert([_secKey length] == 24);
 
@@ -1339,7 +1340,8 @@ static const size_t RCTSRFrameHeaderOverhead = 32;
     if (result) {
       NSLog(@"SecRandomCopyBytes Failed %s", strerror(errno));
     }
-    
+
+    assert(result == 0);
     frame_buffer_size += sizeof(uint32_t);
 
     // TODO: could probably optimize this with SIMD

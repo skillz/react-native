@@ -10,15 +10,15 @@
 #import "RCTShadowText.h"
 
 #import "RCTAccessibilityManager.h"
-#import "RCTUIManager.h"
 #import "RCTBridge.h"
 #import "RCTConvert.h"
+#import "RCTFont.h"
 #import "RCTLog.h"
 #import "RCTShadowRawText.h"
 #import "RCTText.h"
-#import "RCTUtils.h"
-#import "RCTConvert.h"
 #import "RCTTextView.h"
+#import "RCTUIManager.h"
+#import "RCTUtils.h"
 
 NSString *const RCTShadowViewAttributeName = @"RCTShadowViewAttributeName";
 NSString *const RCTIsHighlightedAttributeName = @"IsHighlightedAttributeName";
@@ -42,6 +42,7 @@ static CSSSize RCTMeasure(void *context, float width, CSSMeasureMode widthMode, 
 {
   RCTShadowText *shadowText = (__bridge RCTShadowText *)context;
   NSTextStorage *textStorage = [shadowText buildTextStorageForWidth:width widthMode:widthMode];
+  [shadowText calculateTextFrame:textStorage];
   NSLayoutManager *layoutManager = textStorage.layoutManagers.firstObject;
   NSTextContainer *textContainer = layoutManager.textContainers.firstObject;
   CGSize computedSize = [layoutManager usedRectForTextContainer:textContainer].size;
@@ -110,6 +111,7 @@ static CSSSize RCTMeasure(void *context, float width, CSSMeasureMode widthMode, 
   UIEdgeInsets padding = self.paddingAsInsets;
   CGFloat width = self.frame.size.width - (padding.left + padding.right);
 
+
   NSNumber *parentTag = [[self reactSuperview] reactTag];
   NSTextStorage *textStorage = [self buildTextStorageForWidth:width widthMode:CSSMeasureModeExactly];
   CGRect textFrame = [self calculateTextFrame:textStorage];
@@ -158,7 +160,7 @@ static CSSSize RCTMeasure(void *context, float width, CSSMeasureMode widthMode, 
       CSSNodeRef childNode = child.cssNode;
       float width = CSSNodeStyleGetWidth(childNode);
       float height = CSSNodeStyleGetHeight(childNode);
-      if (isUndefined(width) || isUndefined(height)) {
+      if (CSSValueIsUndefined(width) || CSSValueIsUndefined(height)) {
         RCTLogError(@"Views nested within a <Text> must have a width and height");
       }
       UIFont *font = [textStorage attribute:NSFontAttributeName atIndex:range.location effectiveRange:nil];
@@ -273,9 +275,13 @@ static CSSSize RCTMeasure(void *context, float width, CSSMeasureMode widthMode, 
 
   _effectiveLetterSpacing = letterSpacing.doubleValue;
 
-  UIFont *font = [RCTConvert UIFont:nil withFamily:fontFamily
-                               size:fontSize weight:fontWeight style:fontStyle
-                    scaleMultiplier:_allowFontScaling ? _fontSizeMultiplier : 1.0];
+  UIFont *font = [RCTFont updateFont:nil
+                          withFamily:fontFamily
+                                size:fontSize
+                              weight:fontWeight
+                               style:fontStyle
+                             variant:_fontVariant
+                     scaleMultiplier:_allowFontScaling ? _fontSizeMultiplier : 1.0];
 
   CGFloat heightOfTallestSubview = 0.0;
   NSMutableAttributedString *attributedString = [NSMutableAttributedString new];
@@ -300,7 +306,7 @@ static CSSSize RCTMeasure(void *context, float width, CSSMeasureMode widthMode, 
     } else {
       float width = CSSNodeStyleGetWidth(child.cssNode);
       float height = CSSNodeStyleGetHeight(child.cssNode);
-      if (isUndefined(width) || isUndefined(height)) {
+      if (CSSValueIsUndefined(width) || CSSValueIsUndefined(height)) {
         RCTLogError(@"Views nested within a <Text> must have a width and height");
       }
       NSTextAttachment *attachment = [NSTextAttachment new];
@@ -333,7 +339,9 @@ static CSSSize RCTMeasure(void *context, float width, CSSMeasureMode widthMode, 
   [self _addAttribute:NSFontAttributeName withValue:font toAttributedString:attributedString];
   [self _addAttribute:NSKernAttributeName withValue:letterSpacing toAttributedString:attributedString];
   [self _addAttribute:RCTReactTagAttributeName withValue:self.reactTag toAttributedString:attributedString];
-  [self _setParagraphStyleOnAttributedString:attributedString heightOfTallestSubview:heightOfTallestSubview];
+  [self _setParagraphStyleOnAttributedString:attributedString
+                              fontLineHeight:font.lineHeight
+                      heightOfTallestSubview:heightOfTallestSubview];
 
   // create a non-mutable attributedString for use by the Text system which avoids copies down the line
   _cachedAttributedString = [[NSAttributedString alloc] initWithAttributedString:attributedString];
@@ -356,6 +364,7 @@ static CSSSize RCTMeasure(void *context, float width, CSSMeasureMode widthMode, 
  * varying lineHeights, we simply take the max.
  */
 - (void)_setParagraphStyleOnAttributedString:(NSMutableAttributedString *)attributedString
+                                    fontLineHeight:(CGFloat)fontLineHeight
                       heightOfTallestSubview:(CGFloat)heightOfTallestSubview
 {
   // check if we have lineHeight set on self
@@ -425,6 +434,12 @@ static CSSSize RCTMeasure(void *context, float width, CSSMeasureMode widthMode, 
     [attributedString addAttribute:NSParagraphStyleAttributeName
                              value:paragraphStyle
                              range:(NSRange){0, attributedString.length}];
+
+    if (lineHeight > fontLineHeight) {
+      [attributedString addAttribute:NSBaselineOffsetAttributeName
+                               value:@(lineHeight / 2 - fontLineHeight / 2)
+                               range:(NSRange){0, attributedString.length}];
+    }
   }
 
   // Text decoration
@@ -461,7 +476,6 @@ static CSSSize RCTMeasure(void *context, float width, CSSMeasureMode widthMode, 
 {
   CGRect textFrame = UIEdgeInsetsInsetRect((CGRect){CGPointZero, self.frame.size},
                                            self.paddingAsInsets);
-
 
   if (_adjustsFontSizeToFit) {
     textFrame = [self updateStorage:textStorage toFitFrame:textFrame];
@@ -604,7 +618,6 @@ static CSSSize RCTMeasure(void *context, float width, CSSMeasureMode widthMode, 
   return requiredSize;
 }
 
-
 - (void)setBackgroundColor:(UIColor *)backgroundColor
 {
   super.backgroundColor = backgroundColor;
@@ -618,11 +631,13 @@ static CSSSize RCTMeasure(void *context, float width, CSSMeasureMode widthMode, 
   [self dirtyText];                            \
 }
 
+RCT_TEXT_PROPERTY(AdjustsFontSizeToFit, _adjustsFontSizeToFit, BOOL)
 RCT_TEXT_PROPERTY(Color, _color, UIColor *)
 RCT_TEXT_PROPERTY(FontFamily, _fontFamily, NSString *)
 RCT_TEXT_PROPERTY(FontSize, _fontSize, CGFloat)
 RCT_TEXT_PROPERTY(FontWeight, _fontWeight, NSString *)
 RCT_TEXT_PROPERTY(FontStyle, _fontStyle, NSString *)
+RCT_TEXT_PROPERTY(FontVariant, _fontVariant, NSArray *)
 RCT_TEXT_PROPERTY(IsHighlighted, _isHighlighted, BOOL)
 RCT_TEXT_PROPERTY(LetterSpacing, _letterSpacing, CGFloat)
 RCT_TEXT_PROPERTY(LineHeight, _lineHeight, CGFloat)
