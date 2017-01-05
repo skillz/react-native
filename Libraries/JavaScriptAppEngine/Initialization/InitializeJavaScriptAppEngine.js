@@ -50,10 +50,7 @@ function setUpConsole(): void {
   // ExceptionsManager transitively requires Promise so we install it after
   const ExceptionsManager = require('ExceptionsManager');
   ExceptionsManager.installConsoleErrorReporter();
-
-  if (__DEV__) {
-    require('RCTLog');
-  }
+  require('RCTLog');
 }
 
 /**
