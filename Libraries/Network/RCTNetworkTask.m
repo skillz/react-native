@@ -17,7 +17,7 @@
   NSMutableData *_data;
   id<RCTURLRequestHandler> _handler;
   dispatch_queue_t _callbackQueue;
-
+  
   RCTNetworkTask *_selfReference;
 }
 
@@ -28,16 +28,16 @@
   RCTAssertParam(request);
   RCTAssertParam(handler);
   RCTAssertParam(callbackQueue);
-
+  
   static NSUInteger requestID = 0;
-
+  
   if ((self = [super init])) {
     _requestID = @(requestID++);
     _request = request;
     _handler = handler;
     _callbackQueue = callbackQueue;
     _status = RCTNetworkTaskPending;
-
+    
     dispatch_queue_set_specific(callbackQueue, (__bridge void *)self, (__bridge void *)self, NULL);
   }
   return self;
@@ -53,6 +53,7 @@ RCT_NOT_IMPLEMENTED(- (instancetype)init)
   _incrementalDataBlock = nil;
   _responseBlock = nil;
   _uploadProgressBlock = nil;
+  _requestToken = nil;
 }
 
 - (void)dispatchCallback:(dispatch_block_t)callback
@@ -66,6 +67,11 @@ RCT_NOT_IMPLEMENTED(- (instancetype)init)
 
 - (void)start
 {
+  if (_status != RCTNetworkTaskPending) {
+    RCTLogError(@"RCTNetworkTask was already started or completed");
+    return;
+  }
+  
   if (_requestToken == nil) {
     id token = [_handler sendRequest:_request withDelegate:self];
     if ([self validateRequestToken:token]) {
@@ -77,6 +83,10 @@ RCT_NOT_IMPLEMENTED(- (instancetype)init)
 
 - (void)cancel
 {
+  if (_status == RCTNetworkTaskFinished) {
+    return;
+  }
+  
   _status = RCTNetworkTaskFinished;
   id token = _requestToken;
   if (token && [_handler respondsToSelector:@selector(cancelRequest:)]) {
@@ -102,7 +112,7 @@ RCT_NOT_IMPLEMENTED(- (instancetype)init)
     }
     valid = NO;
   }
-
+  
   if (!valid) {
     _status = RCTNetworkTaskFinished;
     if (_completionBlock) {
@@ -121,7 +131,7 @@ RCT_NOT_IMPLEMENTED(- (instancetype)init)
   if (![self validateRequestToken:requestToken]) {
     return;
   }
-
+  
   if (_uploadProgressBlock) {
     RCTURLRequestProgressBlock uploadProgressBlock = _uploadProgressBlock;
     int64_t length = _request.HTTPBody.length;
@@ -136,7 +146,7 @@ RCT_NOT_IMPLEMENTED(- (instancetype)init)
   if (![self validateRequestToken:requestToken]) {
     return;
   }
-
+  
   _response = response;
   if (_responseBlock) {
     RCTURLRequestResponseBlock responseBlock = _responseBlock;
@@ -151,15 +161,15 @@ RCT_NOT_IMPLEMENTED(- (instancetype)init)
   if (![self validateRequestToken:requestToken]) {
     return;
   }
-
+  
   if (!_data) {
     _data = [NSMutableData new];
   }
   [_data appendData:data];
-
+  
   int64_t length = _data.length;
   int64_t total = _response.expectedContentLength;
-
+  
   if (_incrementalDataBlock) {
     RCTURLRequestIncrementalDataBlock incrementalDataBlock = _incrementalDataBlock;
     [self dispatchCallback:^{
@@ -179,7 +189,7 @@ RCT_NOT_IMPLEMENTED(- (instancetype)init)
   if (![self validateRequestToken:requestToken]) {
     return;
   }
-
+  
   _status = RCTNetworkTaskFinished;
   if (_completionBlock) {
     RCTURLRequestCompletionBlock completionBlock = _completionBlock;
