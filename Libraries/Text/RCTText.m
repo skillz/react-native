@@ -72,7 +72,7 @@ static void collectNonTextDescendants(RCTText *view, NSMutableArray *nonTextDesc
 
 - (void)setTextStorage:(NSTextStorage *)textStorage
 {
-  if (_textStorage != textStorage) {
+  if (_textStorage != textStorage && textStorage) {
     _textStorage = textStorage;
 
     // Update subviews
@@ -89,17 +89,31 @@ static void collectNonTextDescendants(RCTText *view, NSMutableArray *nonTextDesc
         [self addSubview:child];
       }
     }
-
-    [self setNeedsDisplay];
+    
+    dispatch_async(dispatch_get_main_queue(), ^{
+      [self setNeedsDisplay];
+    });
   }
 }
 
 - (void)drawRect:(CGRect)rect
 {
+  if (!self.superview || CGRectEqualToRect(CGRectZero, self.textFrame)) {
+    return;
+  }
+  
   NSLayoutManager *layoutManager = [_textStorage.layoutManagers firstObject];
   NSTextContainer *textContainer = [layoutManager.textContainers firstObject];
-
+  
+  if (!layoutManager || !textContainer) {
+    return;
+  }
+  
   NSRange glyphRange = [layoutManager glyphRangeForTextContainer:textContainer];
+  if (glyphRange.length == 0 || glyphRange.location == NSNotFound) {
+    return;
+  }
+  
   CGRect textFrame = self.textFrame;
   [layoutManager drawBackgroundForGlyphRange:glyphRange atPoint:textFrame.origin];
   [layoutManager drawGlyphsForGlyphRange:glyphRange atPoint:textFrame.origin];
@@ -165,8 +179,15 @@ static void collectNonTextDescendants(RCTText *view, NSMutableArray *nonTextDesc
       _highlightLayer = nil;
     }
   } else if (_textStorage.length) {
-    [self setNeedsDisplay];
+    dispatch_async(dispatch_get_main_queue(), ^{
+      [self setNeedsDisplay];
+    });
   }
+}
+
+- (void)dealloc
+{
+  _textStorage = nil;
 }
 
 
