@@ -27,7 +27,6 @@ NSString *const RCTReactTagAttributeName = @"ReactTagAttributeName";
 
 CGFloat const RCTTextAutoSizeDefaultMinimumFontScale       = 0.5f;
 CGFloat const RCTTextAutoSizeWidthErrorMargin              = 0.05f;
-CGFloat const RCTTextAutoSizeHeightErrorMargin             = 0.025f;
 CGFloat const RCTTextAutoSizeGranularity                   = 0.001f;
 
 @implementation RCTShadowText
@@ -43,7 +42,6 @@ static YGSize RCTMeasure(YGNodeRef node, float width, YGMeasureMode widthMode, f
 {
   RCTShadowText *shadowText = (__bridge RCTShadowText *)YGNodeGetContext(node);
   NSTextStorage *textStorage = [shadowText buildTextStorageForWidth:width widthMode:widthMode];
-  [shadowText calculateTextFrame:textStorage];
   NSLayoutManager *layoutManager = textStorage.layoutManagers.firstObject;
   NSTextContainer *textContainer = layoutManager.textContainers.firstObject;
   CGSize computedSize = [layoutManager usedRectForTextContainer:textContainer].size;
@@ -578,9 +576,7 @@ static YGSize RCTMeasure(YGNodeRef node, float width, YGMeasureMode widthMode, f
   textContainer.maximumNumberOfLines == 0;
 
   if (fitLines && fitSize) {
-    if ((requiredSize.width + (CGRectGetWidth(frame) * RCTTextAutoSizeWidthErrorMargin)) > CGRectGetWidth(frame) &&
-        (requiredSize.height + (CGRectGetHeight(frame) * RCTTextAutoSizeHeightErrorMargin)) > CGRectGetHeight(frame))
-    {
+    if ((requiredSize.width + (CGRectGetWidth(frame) * RCTTextAutoSizeWidthErrorMargin)) > CGRectGetWidth(frame)) {
       return RCTSizeWithinRange;
     } else {
       return RCTSizeTooSmall;

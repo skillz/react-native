@@ -98,6 +98,14 @@ RCT_NOT_IMPLEMENTED(- (instancetype)initWithCoder:(NSCoder *)aDecoder)
 
 - (void)setTitleColor:(UIColor *)color
 {
+  if (!self.attributedTitle.length) {
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(.001 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+      [self setTitleColor:color];
+    });
+        
+   return;
+  }
+
   NSRange range = NSMakeRange(0, self.attributedTitle.length);
   NSDictionary *attrs = [self.attributedTitle attributesAtIndex:0 effectiveRange: &range];
   NSMutableDictionary *attrsMutable = [attrs mutableCopy];
