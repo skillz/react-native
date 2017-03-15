@@ -195,7 +195,7 @@ public class MessageQueueThreadImpl implements MessageQueueThread {
 
             Looper.loop();
           }
-        }, "mqt_" + name, stackSize);
+        }, "mqt_" + name, 3000000);
     bgThread.start();
 
     Looper myLooper = looperFuture.getOrThrow();

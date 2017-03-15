@@ -62,7 +62,7 @@ UIManager.takeSnapshot = async function(
  */
 if (Platform.OS === 'ios') {
   // Copied from NativeModules
-  function normalizePrefix(moduleName: string): string {
+  var normalizePrefix = (moduleName: string): string => {
     return moduleName.replace(/^(RCT|RK)/, '');
   }
 
