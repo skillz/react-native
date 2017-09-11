@@ -86,7 +86,17 @@ public class UIManagerModule extends ReactContextBaseJavaModule implements
   private int mNextRootViewTag = 1;
   private int mBatchId = 0;
 
-  public UIManagerModule(
+  private static Exception mCaughtException;
+
+  public static Exception getCaughtException() {
+    return mCaughtException;
+  }
+
+  public static void setCaughtException(Exception mCaughtException) {
+    UIManagerModule.mCaughtException = mCaughtException;
+  }
+
+    public UIManagerModule(
       ReactApplicationContext reactContext,
       List<ViewManager> viewManagerList,
       UIImplementationProvider uiImplementationProvider) {
