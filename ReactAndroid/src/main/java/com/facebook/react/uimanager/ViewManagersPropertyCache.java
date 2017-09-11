@@ -104,10 +104,9 @@ import com.facebook.react.uimanager.annotations.ReactPropGroup;
           mSetter.invoke(nodeToUpdate, SHADOW_GROUP_ARGS);
           Arrays.fill(SHADOW_GROUP_ARGS, null);
         }
-      } catch (Throwable t) {
-        FLog.e(ViewManager.class, "Error while updating prop " + mPropName, t);
-        throw new JSApplicationIllegalArgumentException("Error while updating property '" +
-            mPropName + "' in shadow node of type: " + nodeToUpdate.getViewClass(), t);
+      } catch (Exception e) {
+        UIManagerModule.setCaughtException(e);
+        FLog.e(ViewManager.class, "Error while updating prop " + mPropName, e);
       }
     }
 
