@@ -126,7 +126,8 @@ static void collectNonTextDescendants(RCTText *view, NSMutableArray *nonTextDesc
 
   __block UIBezierPath *highlightPath = nil;
   NSRange characterRange = [layoutManager characterRangeForGlyphRange:glyphRange actualGlyphRange:NULL];
-  [layoutManager.textStorage enumerateAttribute:RCTIsHighlightedAttributeName inRange:characterRange options:0 usingBlock:^(NSNumber *value, NSRange range, BOOL *_) {
+  NSTextStorage *localTextStorage = [layoutManager.textStorage copy];
+  [localTextStorage enumerateAttribute:RCTIsHighlightedAttributeName inRange:characterRange options:0 usingBlock:^(NSNumber *value, NSRange range, BOOL *_) {
     if (!value.boolValue) {
       return;
     }
