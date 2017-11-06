@@ -1715,14 +1715,16 @@ function createAnimatedComponent(Component: any): any {
 
       // Make sure to get the scrollable node for components that implement
       // `ScrollResponder.Mixin`.
-      const ref = this._component.getScrollableNode ?
-        this._component.getScrollableNode() :
-        this._component;
+      if (this._component) {
+        const ref = this._component.getScrollableNode ?
+          this._component.getScrollableNode() :
+          this._component;
 
-      for (const key in newProps) {
-        const prop = newProps[key];
-        if (prop instanceof AnimatedEvent && prop.__isNative) {
-          prop.__attach(ref, key);
+        for (const key in newProps) {
+          const prop = newProps[key];
+          if (prop instanceof AnimatedEvent && prop.__isNative) {
+            prop.__attach(ref, key);
+          }
         }
       }
     }
@@ -1730,14 +1732,16 @@ function createAnimatedComponent(Component: any): any {
     _detachNativeEvents(props) {
       // Make sure to get the scrollable node for components that implement
       // `ScrollResponder.Mixin`.
-      const ref = this._component.getScrollableNode ?
-        this._component.getScrollableNode() :
-        this._component;
+      if (this._component) {
+        const ref = this._component.getScrollableNode ?
+          this._component.getScrollableNode() :
+          this._component;
 
-      for (const key in props) {
-        const prop = props[key];
-        if (prop instanceof AnimatedEvent && prop.__isNative) {
-          prop.__detach(ref, key);
+        for (const key in props) {
+          const prop = props[key];
+          if (prop instanceof AnimatedEvent && prop.__isNative) {
+            prop.__detach(ref, key);
+          }
         }
       }
     }
