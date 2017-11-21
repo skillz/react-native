@@ -87,7 +87,7 @@ if (tagsWithVersion[0].indexOf('-rc') === -1) {
 }
 
 // -------- Generating Android Artifacts with JavaDoc
-if (exec('./gradlew :ReactAndroid:installArchives').code) {
+if (exec('./gradlew :ReactAndroid:installArchives --stacktrace --debug').code) {
   echo('Couldn\'t generate artifacts');
   exit(1);
 }
