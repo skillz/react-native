@@ -538,15 +538,12 @@ workflows:
           filters: *filter-ignore-gh-pages
     
       # If we are on a stable branch, deploy to `npm`
+      - hold:
+          type: approval
       - deploy:
           filters: *filter-only-stable
           requires:
-            - test-js-node-8
-            - test-js-node-6
-            - test-android
-            - test-objc-ios
-            - test-objc-tvos
-            - test-objc-e2e
+            - hold
       
       # If we are on a master / stable branch, deploy docs
       - deploy-website:
