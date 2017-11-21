@@ -174,7 +174,7 @@ android_defaults: &android_defaults
   environment:
     - TERM: "dumb"
     - ADB_INSTALL_TIMEOUT: 10
-    - GRADLE_OPTS: '-Dorg.gradle.jvmargs="-Xmx2048m -XX:+HeapDumpOnOutOfMemoryError"'
+    - GRADLE_OPTS: '-Dorg.gradle.jvmargs="-Xmx512m -XX:+HeapDumpOnOutOfMemoryError"'
     - ANDROID_NDK: '/opt/ndk/android-ndk-r10e'
     - BUILD_THREADS: 2
 
@@ -320,7 +320,7 @@ jobs:
             fi
 
   # Publishes new version onto npm
-  publish-npm:
+  deploy:
     <<: *android_defaults
     steps:
       - checkout
@@ -508,58 +508,52 @@ jobs:
 # Workflows enables us to run multiple jobs in parallel
 workflows:
   version: 2
-  
-  test_node:
+
+  build:
     jobs:
+
+      # Test Javascript on Node 8 and 6
       - test-js-node-8:
           filters: *filter-ignore-gh-pages
       - test-js-node-6:
           filters: *filter-ignore-gh-pages
-      
-# TODO: Re-enable. Node 4 tests are already failing on Circle 1.0
-#      - test-js-node-4:
-#          filters: *filter-ignore-gh-pages
 
-
-  test_android:
-    jobs:
+      # Test Android
       - build-js-bundle:
           filters: *filter-ignore-gh-pages
       - test-android:
           requires:
             - build-js-bundle
 
-  test_ios:
-    jobs:
+      # Test iOS & tvOS
       - test-objc-ios:
           filters: *filter-ignore-gh-pages
       - test-objc-tvos:
           filters: *filter-ignore-gh-pages
       - test-objc-e2e:
           filters: *filter-ignore-gh-pages
-# TODO: Re-enable. Podspec tests are already failing on Travis
-#      - test-podspec:
-#          filters: *filter-ignore-gh-pages
 
-  website:
-    jobs:
+      # Test website
       - test-website:
           filters: *filter-ignore-gh-pages
+    
+      # If we are on a stable branch, deploy to `npm`
+      - deploy:
+          filters: *filter-only-stable
+          requires:
+            - test-js-node-8
+            - test-js-node-6
+            - test-android
+            - test-objc-ios
+            - test-objc-tvos
+            - test-objc-e2e
+      
+      # If we are on a master / stable branch, deploy docs
       - deploy-website:
+          filters: *filter-only-master-stable
           requires:
             - test-website
-          filters: *filter-only-master-stable
 
-  analyze:
-    jobs:
       - analyze-pull-request:
           filters: *filter-ignore-master-stable
-
-  deploy:
-    jobs:
-      - hold:
-          type: approval
-      - publish-npm:
-          requires: 
-            - hold
-          filters: *filter-only-stable
+      
