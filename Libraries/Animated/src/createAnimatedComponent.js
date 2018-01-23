@@ -53,15 +53,17 @@ function createAnimatedComponent(Component: any): any {
     _attachNativeEvents() {
       // Make sure to get the scrollable node for components that implement
       // `ScrollResponder.Mixin`.
-      const scrollableNode = this._component.getScrollableNode
-        ? this._component.getScrollableNode()
-        : this._component;
+      if (this._component) {
+        const scrollableNode = this._component.getScrollableNode
+          ? this._component.getScrollableNode()
+          : this._component;
 
-      for (const key in this.props) {
-        const prop = this.props[key];
-        if (prop instanceof AnimatedEvent && prop.__isNative) {
-          prop.__attach(scrollableNode, key);
-          this._eventDetachers.push(() => prop.__detach(scrollableNode, key));
+        for (const key in this.props) {
+          const prop = this.props[key];
+          if (prop instanceof AnimatedEvent && prop.__isNative) {
+            prop.__attach(scrollableNode, key);
+            this._eventDetachers.push(() => prop.__detach(scrollableNode, key));
+          }
         }
       }
     }
