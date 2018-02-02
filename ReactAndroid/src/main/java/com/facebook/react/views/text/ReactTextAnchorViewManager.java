@@ -9,6 +9,7 @@
 
 package com.facebook.react.views.text;
 
+import android.support.v4.widget.TextViewCompat;
 import android.text.Spannable;
 import android.text.TextUtils;
 import android.view.Gravity;
@@ -159,5 +160,10 @@ public abstract class ReactTextAnchorViewManager<T extends View, C extends React
   @ReactProp(name = "disabled", defaultBoolean = false)
   public void setDisabled(ReactTextView view, boolean disabled) {
     view.setEnabled(!disabled);
+  }
+
+  @ReactProp(name = "adjustsFontSizeToFit", defaultBoolean = false)
+  public void setAdjustsFontSizeToFit(ReactTextView view, boolean enabled) {
+    TextViewCompat.setAutoSizeTextTypeWithDefaults(view, enabled ? TextViewCompat.AUTO_SIZE_TEXT_TYPE_UNIFORM : TextViewCompat.AUTO_SIZE_TEXT_TYPE_NONE);
   }
 }
