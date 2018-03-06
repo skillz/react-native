@@ -9,16 +9,6 @@
 
 package com.facebook.react.modules.network;
 
-import javax.annotation.Nullable;
-
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.Reader;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
-import java.util.concurrent.TimeUnit;
-
 import android.util.Base64;
 
 import com.facebook.react.bridge.Arguments;
@@ -33,6 +23,15 @@ import com.facebook.react.common.network.OkHttpCallUtil;
 import com.facebook.react.module.annotations.ReactModule;
 import com.facebook.react.modules.core.DeviceEventManagerModule.RCTDeviceEventEmitter;
 
+import javax.annotation.Nullable;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.Reader;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import okhttp3.Call;
 import okhttp3.Callback;
 import okhttp3.CookieJar;
@@ -112,7 +111,7 @@ public final class NetworkingModule extends ReactContextBaseJavaModule {
    * @param context the ReactContext of the application
    */
   public NetworkingModule(final ReactApplicationContext context) {
-    this(context, null, OkHttpClientProvider.createClient(), null);
+    this(context, null, OkHttpClientProvider.getOkHttpClient(), null);
   }
 
   /**
@@ -123,7 +122,7 @@ public final class NetworkingModule extends ReactContextBaseJavaModule {
   public NetworkingModule(
     ReactApplicationContext context,
     List<NetworkInterceptorCreator> networkInterceptorCreators) {
-    this(context, null, OkHttpClientProvider.createClient(), networkInterceptorCreators);
+    this(context, null, OkHttpClientProvider.getOkHttpClient(), networkInterceptorCreators);
   }
 
   /**
@@ -132,7 +131,7 @@ public final class NetworkingModule extends ReactContextBaseJavaModule {
    * caller does not provide one explicitly
    */
   public NetworkingModule(ReactApplicationContext context, String defaultUserAgent) {
-    this(context, defaultUserAgent, OkHttpClientProvider.createClient(), null);
+    this(context, defaultUserAgent, OkHttpClientProvider.getOkHttpClient(), null);
   }
 
   @Override
