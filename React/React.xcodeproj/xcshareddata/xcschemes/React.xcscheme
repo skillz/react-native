@@ -14,9 +14,9 @@
             buildForAnalyzing = "YES">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "139D7E871E25C6D100323FB7"
-               BuildableName = "libdouble-conversion.a"
-               BlueprintName = "double-conversion"
+               BlueprintIdentifier = "83CBBA2D1A601D0E00E9B192"
+               BuildableName = "libReact.a"
+               BlueprintName = "React"
                ReferencedContainer = "container:React.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
@@ -45,9 +45,9 @@
       <MacroExpansion>
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "139D7E871E25C6D100323FB7"
-            BuildableName = "libdouble-conversion.a"
-            BlueprintName = "double-conversion"
+            BlueprintIdentifier = "83CBBA2D1A601D0E00E9B192"
+            BuildableName = "libReact.a"
+            BlueprintName = "React"
             ReferencedContainer = "container:React.xcodeproj">
          </BuildableReference>
       </MacroExpansion>
@@ -63,9 +63,9 @@
       <MacroExpansion>
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "139D7E871E25C6D100323FB7"
-            BuildableName = "libdouble-conversion.a"
-            BlueprintName = "double-conversion"
+            BlueprintIdentifier = "83CBBA2D1A601D0E00E9B192"
+            BuildableName = "libReact.a"
+            BlueprintName = "React"
             ReferencedContainer = "container:React.xcodeproj">
          </BuildableReference>
       </MacroExpansion>
