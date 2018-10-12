@@ -45,7 +45,7 @@ function fetch_and_unpack () {
     done
 
     dir=$(basename "$file" .tar.gz)
-    if [ "$fetched" = "yes" ] || [ ! -d "third-party/$dir" ]; then
+    if [ "$fetched" = "yes" ] || [ ! -f "third-party/$dir/.installed" ]; then
         (cd third-party;
          rm -rf "$dir"
          echo Unpacking "$cachedir/$file"...
@@ -53,13 +53,13 @@ function fetch_and_unpack () {
              file_fail "$cachedir/$file" "Unpacking '$cachedir/$file' failed"
          fi
          cd "$dir"
-         eval "${cmd:-true}")
+         eval "${cmd:-true}" && touch .installed)
     fi
 }
 
 mkdir -p third-party
 
-SCRIPTDIR=$(dirname "$0")
+SCRIPTDIR=$(cd $(dirname "$0") && pwd)
 
 fetch_and_unpack glog-0.3.4.tar.gz https://github.com/google/glog/archive/v0.3.4.tar.gz 69f91cd5a1de35ead0bc4103ea87294b0206a456 "\"$SCRIPTDIR/ios-configure-glog.sh\""
 fetch_and_unpack double-conversion-1.1.5.tar.gz https://github.com/google/double-conversion/archive/v1.1.5.tar.gz 96a8aba1b4ce7d4a7a3c123be26c379c2fed1def
