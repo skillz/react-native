@@ -3814,7 +3814,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "rm -rf ${HOME}/.rncache\ncd \"\\\"$SRCROOT/..\\\"\"\nexec ./scripts/ios-install-third-party.sh\n";
+			shellScript = "rm -rf ${HOME}/.rncache\ncd \"\\\"$SRCROOT/\\\"\"\ncd ..\nexec ./scripts/ios-install-third-party.sh\n";
 		};
 		2D6948201DA3042200B3FA97 /* Include RCTJSCProfiler */ = {
 			isa = PBXShellScriptBuildPhase;
