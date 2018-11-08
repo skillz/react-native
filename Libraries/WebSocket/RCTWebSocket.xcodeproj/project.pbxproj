@@ -9,11 +9,11 @@
 /* Begin PBXBuildFile section */
 		1338BBE01B04ACC80064A9C9 /* RCTSRWebSocket.m in Sources */ = {isa = PBXBuildFile; fileRef = 1338BBDD1B04ACC80064A9C9 /* RCTSRWebSocket.m */; };
 		1338BBE11B04ACC80064A9C9 /* RCTWebSocketExecutor.m in Sources */ = {isa = PBXBuildFile; fileRef = 1338BBDF1B04ACC80064A9C9 /* RCTWebSocketExecutor.m */; };
-		13526A521F362F7F0008EF00 /* libfishhook.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 13526A511F362F7F0008EF00 /* libfishhook.a */; };
 		2D3B5F3D1D9B165B00451313 /* RCTSRWebSocket.m in Sources */ = {isa = PBXBuildFile; fileRef = 1338BBDD1B04ACC80064A9C9 /* RCTSRWebSocket.m */; };
 		2D3B5F3E1D9B165B00451313 /* RCTWebSocketExecutor.m in Sources */ = {isa = PBXBuildFile; fileRef = 1338BBDF1B04ACC80064A9C9 /* RCTWebSocketExecutor.m */; };
 		2D3B5F401D9B165B00451313 /* RCTWebSocketModule.m in Sources */ = {isa = PBXBuildFile; fileRef = 3C86DF7B1ADF695F0047B81A /* RCTWebSocketModule.m */; };
 		2DC5E5281F3A6CFD000EE84B /* libfishhook-tvOS.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 2DC5E5271F3A6CFD000EE84B /* libfishhook-tvOS.a */; };
+		313D056921193110006C8303 /* libfishhook.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 3DBE0D001F3B181A0099AA32 /* libfishhook.a */; };
 		3C86DF7C1ADF695F0047B81A /* RCTWebSocketModule.m in Sources */ = {isa = PBXBuildFile; fileRef = 3C86DF7B1ADF695F0047B81A /* RCTWebSocketModule.m */; };
 		3DBE0D141F3B185A0099AA32 /* fishhook.c in Sources */ = {isa = PBXBuildFile; fileRef = 3DBE0D121F3B185A0099AA32 /* fishhook.c */; };
 		3DBE0D151F3B185A0099AA32 /* fishhook.c in Sources */ = {isa = PBXBuildFile; fileRef = 3DBE0D121F3B185A0099AA32 /* fishhook.c */; };
@@ -87,7 +87,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				13526A521F362F7F0008EF00 /* libfishhook.a in Frameworks */,
+				313D056921193110006C8303 /* libfishhook.a in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
