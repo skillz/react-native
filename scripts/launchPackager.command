@@ -12,7 +12,7 @@ echo -en "\033]0;React Packager\a"
 clear
 
 THIS_DIR=$(dirname "$0")
-. "$THIS_DIR/packager.sh"
+cd "$THIS_DIR/../.." && yarn start
 
 echo "Process terminated. Press <enter> to close the window"
 read
