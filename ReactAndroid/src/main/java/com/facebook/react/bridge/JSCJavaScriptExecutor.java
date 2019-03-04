@@ -9,26 +9,18 @@
 
 package com.facebook.react.bridge;
 
+import com.facebook.jni.HybridData;
 import com.facebook.proguard.annotations.DoNotStrip;
-import com.facebook.soloader.SoLoader;
 
 @DoNotStrip
-public class JSCJavaScriptExecutor extends JavaScriptExecutor {
-  public static class Factory implements JavaScriptExecutor.Factory {
-    @Override
-    public JavaScriptExecutor create() throws Exception {
-      return new JSCJavaScriptExecutor();
-    }
-  }
-
+/* package */ class JSCJavaScriptExecutor extends JavaScriptExecutor {
   static {
-    SoLoader.loadLibrary(ReactBridge.REACT_NATIVE_LIB);
+    ReactBridge.staticInit();
   }
 
-  public JSCJavaScriptExecutor() {
-    initialize();
+  /* package */ JSCJavaScriptExecutor(ReadableNativeMap jscConfig) {
+    super(initHybrid(jscConfig));
   }
 
-  private native void initialize();
-
+  private native static HybridData initHybrid(ReadableNativeMap jscConfig);
 }

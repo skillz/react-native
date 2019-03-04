@@ -11,19 +11,21 @@
  */
 'use strict';
 
-var React = require('react-native');
+var React = require('react');
+var createReactClass = require('create-react-class');
+var ReactNative = require('react-native');
 var {
   Image,
   LayoutAnimation,
   StyleSheet,
   Text,
   View,
-} = React;
-var { TestModule } = React.NativeModules;
+} = ReactNative;
+var { TestModule } = ReactNative.NativeModules;
 
 var deepDiffer = require('deepDiffer');
 
-function debug() {
+function debug(...args) {
   // console.log.apply(null, arguments);
 }
 
@@ -57,7 +59,8 @@ type State = {
   containerStyle?: Style,
 };
 
-var LayoutEventsTest = React.createClass({
+var LayoutEventsTest = createReactClass({
+  displayName: 'LayoutEventsTest',
   getInitialState(): State {
     return {
       didAnimation: false,

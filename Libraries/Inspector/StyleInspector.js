@@ -16,7 +16,7 @@ var StyleSheet = require('StyleSheet');
 var Text = require('Text');
 var View = require('View');
 
-class StyleInspector extends React.Component {
+class StyleInspector extends React.Component<$FlowFixMeProps> {
   render() {
     if (!this.props.style) {
       return <Text style={styles.noStyle}>No style</Text>;
@@ -25,10 +25,14 @@ class StyleInspector extends React.Component {
     return (
       <View style={styles.container}>
         <View>
-          {names.map(name => <Text style={styles.attr}>{name}:</Text>)}
+          {names.map(name => <Text key={name} style={styles.attr}>{name}:</Text>)}
         </View>
+
         <View>
-          {names.map(name => <Text style={styles.value}>{this.props.style[name]}</Text>)}
+          {names.map(name => {
+            var value = typeof this.props.style[name] === 'object' ? JSON.stringify(this.props.style[name]) : this.props.style[name];
+            return <Text key={name} style={styles.value}>{value}</Text>;
+          } ) }
         </View>
       </View>
     );

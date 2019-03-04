@@ -12,11 +12,19 @@
 
 'use strict';
 
-var AndroidConstants = require('NativeModules').AndroidConstants;
+const NativeModules = require('NativeModules');
 
-var Platform = {
+const Platform = {
   OS: 'android',
-  Version: AndroidConstants.Version,
+  get Version() {
+    const constants = NativeModules.PlatformConstants;
+    return constants && constants.Version;
+  },
+  get isTesting(): boolean {
+    const constants = NativeModules.PlatformConstants;
+    return constants && constants.isTesting;
+  },
+  select: (obj: Object) => 'android' in obj ? obj.android : obj.default,
 };
 
 module.exports = Platform;

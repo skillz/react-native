@@ -11,9 +11,9 @@
  */
 'use strict';
 
-var LayoutPropTypes = require('LayoutPropTypes');
-var ReactPropTypes = require('ReactPropTypes');
 var ColorPropType = require('ColorPropType');
+var LayoutPropTypes = require('LayoutPropTypes');
+var ReactPropTypes = require('prop-types');
 var ShadowPropTypesIOS = require('ShadowPropTypesIOS');
 var TransformPropTypes = require('TransformPropTypes');
 
@@ -31,11 +31,17 @@ var ViewStylePropTypes = {
   borderRightColor: ColorPropType,
   borderBottomColor: ColorPropType,
   borderLeftColor: ColorPropType,
+  borderStartColor: ColorPropType,
+  borderEndColor: ColorPropType,
   borderRadius: ReactPropTypes.number,
   borderTopLeftRadius: ReactPropTypes.number,
   borderTopRightRadius: ReactPropTypes.number,
+  borderTopStartRadius: ReactPropTypes.number,
+  borderTopEndRadius: ReactPropTypes.number,
   borderBottomLeftRadius: ReactPropTypes.number,
   borderBottomRightRadius: ReactPropTypes.number,
+  borderBottomStartRadius: ReactPropTypes.number,
+  borderBottomEndRadius: ReactPropTypes.number,
   borderStyle: ReactPropTypes.oneOf(['solid', 'dotted', 'dashed']),
   borderWidth: ReactPropTypes.number,
   borderTopWidth: ReactPropTypes.number,
@@ -43,7 +49,6 @@ var ViewStylePropTypes = {
   borderBottomWidth: ReactPropTypes.number,
   borderLeftWidth: ReactPropTypes.number,
   opacity: ReactPropTypes.number,
-  overflow: ReactPropTypes.oneOf(['visible', 'hidden']),
   /**
    * (Android-only) Sets the elevation of a view, using Android's underlying
    * [elevation API](https://developer.android.com/training/material/shadows-clipping.html#Elevation).

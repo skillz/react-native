@@ -7,36 +7,36 @@
  * of patent rights can be found in the PATENTS file in the same directory.
  *
  * @providesModule processColor
+ * @flow
  */
 'use strict';
 
-var tinycolor = require('tinycolor');
-var Platform = require('Platform');
+const Platform = require('Platform');
+
+const normalizeColor = require('normalizeColor');
 
 /* eslint no-bitwise: 0 */
-function processColor(color) {
-  if (!color || typeof color === 'number') {
+function processColor(color?: string | number): ?number {
+  if (color === undefined || color === null) {
     return color;
-  } else if (color instanceof Array) {
-    return color.map(processColor);
-  } else {
-    var color = tinycolor(color);
-    if (color.isValid()) {
-      var rgb = color.toRgb();
-      // All bitwise operations happen on 32-bit numbers, so we shift the 1 first
-      // then multiply it with the actual value.
-      var colorInt = Math.round(rgb.a * 255) * (1 << 24) + rgb.r * (1 << 16) + rgb.g * (1 << 8) + rgb.b;
-      if (Platform.OS === 'android') {
-        // Android use 32 bit *signed* integer to represent the color
-        // We utilize the fact that bitwise operations in JS also operates on
-        // signed 32 bit integers, so that we can use those to convert from
-        // *unsigned* to *signed* 32bit int that way.
-        colorInt = colorInt | 0x0;
-      }
-      return colorInt;
-    }
-    return 0;
   }
+
+  let int32Color = normalizeColor(color);
+  if (int32Color === null || int32Color === undefined) {
+    return undefined;
+  }
+
+  // Converts 0xrrggbbaa into 0xaarrggbb
+  int32Color = (int32Color << 24 | int32Color >>> 8) >>> 0;
+
+  if (Platform.OS === 'android') {
+    // Android use 32 bit *signed* integer to represent the color
+    // We utilize the fact that bitwise operations in JS also operates on
+    // signed 32 bit integers, so that we can use those to convert from
+    // *unsigned* to *signed* 32bit int that way.
+    int32Color = int32Color | 0x0;
+  }
+  return int32Color;
 }
 
 module.exports = processColor;

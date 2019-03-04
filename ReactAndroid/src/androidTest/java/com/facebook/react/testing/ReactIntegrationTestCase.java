@@ -22,15 +22,20 @@ import android.view.ViewGroup;
 
 import com.facebook.infer.annotation.Assertions;
 import com.facebook.react.bridge.BaseJavaModule;
-import com.facebook.react.bridge.ReactContext;
-import com.facebook.react.bridge.ReactApplicationContext;
-import com.facebook.react.bridge.CatalystInstanceImpl;
+import com.facebook.react.bridge.CatalystInstance;
 import com.facebook.react.bridge.LifecycleEventListener;
+import com.facebook.react.bridge.ReactApplicationContext;
+import com.facebook.react.bridge.ReactContext;
 import com.facebook.react.bridge.SoftAssertions;
 import com.facebook.react.bridge.UiThreadUtil;
-import com.facebook.react.common.ApplicationHolder;
 import com.facebook.react.common.futures.SimpleSettableFuture;
+import com.facebook.react.devsupport.interfaces.DevSupportManager;
 import com.facebook.react.modules.core.Timing;
+import com.facebook.react.testing.idledetection.ReactBridgeIdleSignaler;
+import com.facebook.react.testing.idledetection.ReactIdleDetectionUtil;
+import com.facebook.soloader.SoLoader;
+
+import static org.mockito.Mockito.mock;
 
 /**
  * Use this class for writing integration tests of catalyst. This class will run all JNI call
@@ -41,17 +46,17 @@ import com.facebook.react.modules.core.Timing;
  *
  * In order to write catalyst integration:
  *  1) Make {@link ReactIntegrationTestCase} a base class of your test case
- *  2) Use {@link ReactIntegrationTestCase.ReactTestInstanceBuilder}
+ *  2) Use {@link ReactTestHelper#catalystInstanceBuilder()}
  *  instead of {@link com.facebook.react.bridge.CatalystInstanceImpl.Builder} to build catalyst
  *  instance for testing purposes
  *
  */
 public abstract class ReactIntegrationTestCase extends AndroidTestCase {
 
-  private static final long SETUP_TIMEOUT_MS = 5000;
-  private static final long IDLE_TIMEOUT_MS = 15000;
+  // we need a bigger timeout for CI builds because they run on a slow emulator
+  private static final long IDLE_TIMEOUT_MS = 60000;
 
-  private @Nullable CatalystInstanceImpl mInstance;
+  private @Nullable CatalystInstance mInstance;
   private @Nullable ReactBridgeIdleSignaler mBridgeIdleSignaler;
   private @Nullable ReactApplicationContext mReactContext;
 
@@ -71,14 +76,17 @@ public abstract class ReactIntegrationTestCase extends AndroidTestCase {
       mReactContext = null;
       mInstance = null;
 
+      final SimpleSettableFuture<Void> semaphore = new SimpleSettableFuture<>();
       UiThreadUtil.runOnUiThread(new Runnable() {
         @Override
         public void run() {
           if (contextToDestroy != null) {
-            contextToDestroy.onDestroy();
+            contextToDestroy.destroy();
           }
+          semaphore.set(null);
         }
       });
+      semaphore.getOrThrow();
     }
   }
 
@@ -132,7 +140,7 @@ public abstract class ReactIntegrationTestCase extends AndroidTestCase {
         new Runnable() {
           @Override
           public void run() {
-            Timing timing = new Timing(getContext());
+            Timing timing = new Timing(getContext(), mock(DevSupportManager.class));
             simpleSettableFuture.set(timing);
           }
         });
@@ -143,31 +151,11 @@ public abstract class ReactIntegrationTestCase extends AndroidTestCase {
     }
   }
 
-  public class ReactTestInstanceBuilder extends CatalystInstanceImpl.Builder {
-
-    @Override
-    public CatalystInstanceImpl build() {
-      // Call build in separate looper and wait for it to finish before returning
-      final Event setupEvent = new Event();
-      UiThreadUtil.runOnUiThread(
-          new Runnable() {
-            @Override
-            public void run() {
-              mInstance = ReactTestInstanceBuilder.super.build();
-              mBridgeIdleSignaler = new ReactBridgeIdleSignaler();
-              mInstance.addBridgeIdleDebugListener(mBridgeIdleSignaler);
-              getContext().initializeWithInstance(mInstance);
-              ApplicationHolder.setApplication((Application) getContext().getApplicationContext());
-              setupEvent.occur();
-            }
-          });
-
-      if (!setupEvent.await(SETUP_TIMEOUT_MS)) {
-        throw new RuntimeException(
-            "Instance setup should take less than " + SETUP_TIMEOUT_MS + "ms");
-      }
-      return mInstance;
-    }
+  public void initializeWithInstance(CatalystInstance instance) {
+    mInstance = instance;
+    mBridgeIdleSignaler = new ReactBridgeIdleSignaler();
+    mInstance.addBridgeIdleDebugListener(mBridgeIdleSignaler);
+    getContext().initializeWithInstance(mInstance);
   }
 
   public boolean waitForBridgeIdle(long millis) {
@@ -183,6 +171,12 @@ public abstract class ReactIntegrationTestCase extends AndroidTestCase {
         Assertions.assertNotNull(mBridgeIdleSignaler),
         getContext(),
         IDLE_TIMEOUT_MS);
+  }
+
+  @Override
+  protected void setUp() throws Exception {
+    super.setUp();
+    SoLoader.init(getContext(), /* native exopackage */ false);
   }
 
   @Override

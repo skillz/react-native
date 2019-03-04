@@ -4,7 +4,9 @@ title: Linking Libraries
 layout: docs
 category: Guides (iOS)
 permalink: docs/linking-libraries-ios.html
-next: running-on-device-ios
+banner: ejected
+next: running-on-simulator-ios
+previous: custom-webview-ios
 ---
 
 Not every app uses all the native capabilities, and including the code to support
@@ -22,39 +24,32 @@ to `require` it. Other libraries also rely on some native code, in that case
 you'll have to add these files to your app, otherwise the app will throw an
 error as soon as you try to use the library._
 
-## Here the few steps to link your libraries that contain native code
+## Here are the few steps to link your libraries that contain native code
 
 ### Automatic linking
 
-"[rnpm](http://github.com/rnpm/rnpm)" is a community project that allows linking of native dependencies automatically:
-
 #### Step 1
-
-Install `rnpm`:
-```bash
-$ npm install rnpm -g
-```
-
-**Note:** _`rnpm` requires `node` version 4.1 or higher_
-
-#### Step 2
 
 Install a library with native dependencies:
 ```bash
 $ npm install <library-with-native-dependencies> --save
 ```
 
-**Note:** _`--save` or `--save-dev` flag is very important for this step. `rnpm` will link
-your libs based on `dependencies` and `devDependencies` in your `package.json` file._
+> ***Note:*** `--save` or `--save-dev` flag is very important for this step. React Native will link
+your libs based on `dependencies` and `devDependencies` in your `package.json` file.
 
-#### Step 3
+#### Step 2
 
 Link your native dependencies:
 ```bash
-$ rnpm link
+$ react-native link
 ```
 
-Done! All libraries with a native dependencies should be successfully linked to your iOS/Android project.
+Done! All libraries with native dependencies should be successfully linked to your iOS/Android project.
+
+> ***Note:*** If your iOS project is using CocoaPods (contains `Podfile`) and linked library has `podspec` file,
+then `react-native link` will link library using Podfile. To support non-trivial Podfiles 
+add `# Add new pods below this line` comment to places where you expect pods to be added.
 
 ### Manual linking
 
@@ -65,7 +60,7 @@ folder.
 Drag this file to your project on Xcode (usually under the `Libraries` group
 on Xcode);
 
-![](/react-native/img/AddToLibraries.png)
+![](img/AddToLibraries.png)
 
 #### Step 2
 
@@ -73,7 +68,7 @@ Click on your main project file (the one that represents the `.xcodeproj`)
 select `Build Phases` and drag the static library from the `Products` folder
 inside the Library you are importing to `Link Binary With Libraries`
 
-![](/react-native/img/AddToBuildPhases.png)
+![](img/AddToBuildPhases.png)
 
 #### Step 3
 
@@ -85,7 +80,7 @@ What that means is, are you using this library on the native side or only in
 JavaScript? If you are only using it in JavaScript, you are good to go!
 
 This step is not necessary for libraries that we ship with React Native with the
-exception of `PushNotificationIOS` and `LinkingIOS`.
+exception of `PushNotificationIOS` and `Linking`.
 
 In the case of the `PushNotificationIOS` for example, you have to call a method
 on the library from your `AppDelegate` every time a new push notification is
@@ -97,4 +92,4 @@ Paths`. There you should include the path to your library (if it has relevant
 files on subdirectories remember to make it `recursive`, like `React` on the
 example).
 
-![](/react-native/img/AddToSearchPaths.png)
+![](img/AddToSearchPaths.png)

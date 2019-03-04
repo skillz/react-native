@@ -7,9 +7,10 @@
  * of patent rights can be found in the PATENTS file in the same directory.
  */
 
-typedef void (^RCTSourceLoadBlock)(NSError *error, NSData *source);
+#import <React/RCTJavaScriptLoader.h>
 
 @class RCTBridge;
+@protocol RCTBridgeModule;
 
 @protocol RCTBridgeDelegate <NSObject>
 
@@ -37,7 +38,39 @@ typedef void (^RCTSourceLoadBlock)(NSError *error, NSData *source);
  * not recommended in most cases - if the module methods and behavior do not
  * match exactly, it may lead to bugs or crashes.
  */
-- (NSArray *)extraModulesForBridge:(RCTBridge *)bridge;
+- (NSArray<id<RCTBridgeModule>> *)extraModulesForBridge:(RCTBridge *)bridge;
+
+/**
+ * Configure whether the JSCExecutor created should use the system JSC API or
+ * alternative hooks provided. When returning YES from this method, you must have
+ * previously called facebook::react::setCustomJSCWrapper.
+ *
+ * @experimental
+ */
+- (BOOL)shouldBridgeUseCustomJSC:(RCTBridge *)bridge;
+
+/**
+ * Configure whether the legacy RCTBatchedBridge or new RCTCxxBridge
+ * should be used.  If this method is implemented and the specified
+ * bridge is not linked in, startup will fail.  If this method is not
+ * implemented, the implementation will default to RCTBatchedBridge,
+ * but if it is not linked in, will try RCTCxxBridge instead.  If
+ * neither bridge is linked in, startup will fail.  This order will be
+ * reversed in the near future, as the legacy bridge is closer to
+ * being removed.
+ *
+ * @experimental
+ */
+- (BOOL)shouldBridgeUseCxxBridge:(RCTBridge *)bridge;
+
+/**
+* The bridge will call this method when a module been called from JS
+* cannot be found among registered modules.
+* It should return YES if the module with name 'moduleName' was registered
+* in the implementation, and the system must attempt to look for it again among registered.
+* If the module was not registered, return NO to prevent further searches.
+*/
+- (BOOL)bridge:(RCTBridge *)bridge didNotFindModule:(NSString *)moduleName;
 
 /**
  * The bridge will automatically attempt to load the JS source code from the
@@ -45,12 +78,21 @@ typedef void (^RCTSourceLoadBlock)(NSError *error, NSData *source);
  * to handle loading the JS yourself, you can do so by implementing this method.
  */
 - (void)loadSourceForBridge:(RCTBridge *)bridge
+                 onProgress:(RCTSourceLoadProgressBlock)onProgress
+                 onComplete:(RCTSourceLoadBlock)loadCallback;
+
+/**
+ * Similar to loadSourceForBridge:onProgress:onComplete: but without progress
+ * reporting.
+ */
+- (void)loadSourceForBridge:(RCTBridge *)bridge
                   withBlock:(RCTSourceLoadBlock)loadCallback;
 
 /**
- * Indicates whether Hot Loading is supported or not.
- * Note: this method will be removed soon, once Hot Loading is supported on OSS.
+ * Specifies the path to folder where additional bundles are located
+ *
+ * @experimental
  */
-- (BOOL)bridgeSupportsHotLoading:(RCTBridge *)bridge;
+- (NSURL *)jsBundlesDirectory;
 
 @end

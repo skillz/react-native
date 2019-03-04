@@ -1,23 +1,34 @@
 /**
- * Copyright 2004-present Facebook. All Rights Reserved.
+ * Copyright (c) 2013-present, Facebook, Inc.
+ * All rights reserved.
+ *
+ * This source code is licensed under the BSD-style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
  *
  * @providesModule ViewPagerAndroid
  * @flow
  */
 'use strict';
 
-var NativeMethodsMixin = require('NativeMethodsMixin');
 var React = require('React');
-var ReactElement = require('ReactElement');
-var ReactNativeViewAttributes = require('ReactNativeViewAttributes');
-var ReactPropTypes = require('ReactPropTypes');
+var PropTypes = require('prop-types');
+var ReactNative = require('ReactNative');
 var UIManager = require('UIManager');
-var View = require('View');
+var ViewPropTypes = require('ViewPropTypes');
 
 var dismissKeyboard = require('dismissKeyboard');
 var requireNativeComponent = require('requireNativeComponent');
 
 var VIEWPAGER_REF = 'viewPager';
+
+type Event = Object;
+
+export type ViewPagerScrollState = $Enum<{
+  idle: string,
+  dragging: string,
+  settling: string,
+}>;
 
 /**
  * Container that allows to flip left and right between child views. Each
@@ -26,7 +37,7 @@ var VIEWPAGER_REF = 'viewPager';
  *
  * It is important all children are `<View>`s and not composite components.
  * You can set style properties like `padding` or `backgroundColor` for each
- * child.
+ * child. It is also important that each child have a `key` prop.
  *
  * Example:
  *
@@ -36,10 +47,10 @@ var VIEWPAGER_REF = 'viewPager';
  *     <ViewPagerAndroid
  *       style={styles.viewPager}
  *       initialPage={0}>
- *       <View style={styles.pageStyle}>
+ *       <View style={styles.pageStyle} key="1">
  *         <Text>First page</Text>
  *       </View>
- *       <View style={styles.pageStyle}>
+ *       <View style={styles.pageStyle} key="2">
  *         <Text>Second page</Text>
  *       </View>
  *     </ViewPagerAndroid>
@@ -50,6 +61,9 @@ var VIEWPAGER_REF = 'viewPager';
  *
  * var styles = {
  *   ...
+ *   viewPager: {
+ *     flex: 1
+ *   },
  *   pageStyle: {
  *     alignItems: 'center',
  *     padding: 20,
@@ -57,15 +71,23 @@ var VIEWPAGER_REF = 'viewPager';
  * }
  * ```
  */
-var ViewPagerAndroid = React.createClass({
-
-  propTypes: {
-    ...View.propTypes,
+class ViewPagerAndroid extends React.Component<{
+  initialPage?: number,
+  onPageScroll?: Function,
+  onPageScrollStateChanged?: Function,
+  onPageSelected?: Function,
+  pageMargin?: number,
+  peekEnabled?: boolean,
+  keyboardDismissMode?: 'none' | 'on-drag',
+  scrollEnabled?: boolean,
+}> {
+  static propTypes = {
+    ...ViewPropTypes,
     /**
      * Index of initial page that should be selected. Use `setPage` method to
      * update the page, and `onPageSelected` to monitor page changes
      */
-    initialPage: ReactPropTypes.number,
+    initialPage: PropTypes.number,
 
     /**
      * Executed when transitioning between pages (ether because of animation for
@@ -76,7 +98,17 @@ var ViewPagerAndroid = React.createClass({
      *    Value x means that (1 - x) fraction of the page at "position" index is
      *    visible, and x fraction of the next page is visible.
      */
-    onPageScroll: ReactPropTypes.func,
+    onPageScroll: PropTypes.func,
+
+    /**
+     * Function called when the page scrolling state has changed.
+     * The page scrolling state can be in 3 states:
+     * - idle, meaning there is no interaction with the page scroller happening at the time
+     * - dragging, meaning there is currently an interaction with the page scroller
+     * - settling, meaning that there was an interaction with the page scroller, and the
+     *   page scroller is now finishing it's closing or opening animation
+     */
+    onPageScrollStateChanged: PropTypes.func,
 
     /**
      * This callback will be called once ViewPager finish navigating to selected page
@@ -84,34 +116,55 @@ var ViewPagerAndroid = React.createClass({
      * callback will have following fields:
      *  - position - index of page that has been selected
      */
-    onPageSelected: ReactPropTypes.func,
+    onPageSelected: PropTypes.func,
+
+    /**
+     * Blank space to show between pages. This is only visible while scrolling, pages are still
+     * edge-to-edge.
+     */
+    pageMargin: PropTypes.number,
 
     /**
      * Determines whether the keyboard gets dismissed in response to a drag.
      *   - 'none' (the default), drags do not dismiss the keyboard.
      *   - 'on-drag', the keyboard is dismissed when a drag begins.
      */
-    keyboardDismissMode: ReactPropTypes.oneOf([
+    keyboardDismissMode: PropTypes.oneOf([
       'none', // default
       'on-drag',
     ]),
-  },
 
-  componentDidMount: function() {
-    if (this.props.initialPage) {
+    /**
+    * When false, the content does not scroll.
+    * The default value is true.
+    */
+    scrollEnabled: PropTypes.bool,
+
+    /**
+     * Whether enable showing peekFraction or not. If this is true, the preview of
+     * last and next page will show in current screen. Defaults to false.
+     */
+     peekEnabled: PropTypes.bool,
+  };
+
+  componentDidMount() {
+    if (this.props.initialPage != null) {
       this.setPageWithoutAnimation(this.props.initialPage);
     }
-  },
+  }
 
-  getInnerViewNode: function(): ReactComponent {
+  getInnerViewNode = (): ReactComponent => {
     return this.refs[VIEWPAGER_REF].getInnerViewNode();
-  },
+  };
 
-  _childrenWithOverridenStyle: function(): Array {
+  _childrenWithOverridenStyle = (): Array => {
     // Override styles so that each page will fill the parent. Native component
     // will handle positioning of elements, so it's not important to offset
     // them correctly.
     return React.Children.map(this.props.children, function(child) {
+      if (!child) {
+        return null;
+      }
       var newProps = {
         ...child.props,
         style: [child.props.style, {
@@ -131,61 +184,69 @@ var ViewPagerAndroid = React.createClass({
           (child.type.displayName !== 'View')) {
         console.warn('Each ViewPager child must be a <View>. Was ' + child.type.displayName);
       }
-      return ReactElement.createElement(child.type, newProps);
+      return React.createElement(child.type, newProps);
     });
-  },
+  };
 
-  _onPageScroll: function(e: Event) {
+  _onPageScroll = (e: Event) => {
     if (this.props.onPageScroll) {
       this.props.onPageScroll(e);
     }
     if (this.props.keyboardDismissMode === 'on-drag') {
       dismissKeyboard();
     }
-  },
+  };
 
-  _onPageSelected: function(e: Event) {
+  _onPageScrollStateChanged = (e: Event) => {
+    if (this.props.onPageScrollStateChanged) {
+      this.props.onPageScrollStateChanged(e.nativeEvent.pageScrollState);
+    }
+  };
+
+  _onPageSelected = (e: Event) => {
     if (this.props.onPageSelected) {
       this.props.onPageSelected(e);
     }
-  },
+  };
 
   /**
    * A helper function to scroll to a specific page in the ViewPager.
    * The transition between pages will be animated.
    */
-  setPage: function(selectedPage: number) {
+  setPage = (selectedPage: number) => {
     UIManager.dispatchViewManagerCommand(
-      React.findNodeHandle(this),
+      ReactNative.findNodeHandle(this),
       UIManager.AndroidViewPager.Commands.setPage,
       [selectedPage],
     );
-  },
+  };
 
   /**
    * A helper function to scroll to a specific page in the ViewPager.
-   * The transition between pages will be *not* be animated.
+   * The transition between pages will *not* be animated.
    */
-  setPageWithoutAnimation: function(selectedPage: number) {
+  setPageWithoutAnimation = (selectedPage: number) => {
     UIManager.dispatchViewManagerCommand(
-      React.findNodeHandle(this),
+      ReactNative.findNodeHandle(this),
       UIManager.AndroidViewPager.Commands.setPageWithoutAnimation,
       [selectedPage],
     );
-  },
+  };
 
-  render: function() {
+  render() {
     return (
       <NativeAndroidViewPager
+        {...this.props}
         ref={VIEWPAGER_REF}
         style={this.props.style}
         onPageScroll={this._onPageScroll}
+        onPageScrollStateChanged={this._onPageScrollStateChanged}
         onPageSelected={this._onPageSelected}
         children={this._childrenWithOverridenStyle()}
       />
     );
-  },
-});
+  }
+}
 
 var NativeAndroidViewPager = requireNativeComponent('AndroidViewPager', ViewPagerAndroid);
 

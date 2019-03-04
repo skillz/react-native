@@ -11,23 +11,67 @@ package com.facebook.react.views.text;
 
 import android.content.Context;
 import android.graphics.drawable.Drawable;
+import android.os.Build;
 import android.text.Layout;
 import android.text.Spanned;
+import android.text.TextUtils;
+import android.view.Gravity;
+import android.view.ViewGroup;
 import android.widget.TextView;
-
 import com.facebook.react.uimanager.ReactCompoundView;
+import com.facebook.react.uimanager.ViewDefaults;
+import com.facebook.react.views.view.ReactViewBackgroundManager;
+import javax.annotation.Nullable;
 
 public class ReactTextView extends TextView implements ReactCompoundView {
 
+  private static final ViewGroup.LayoutParams EMPTY_LAYOUT_PARAMS =
+    new ViewGroup.LayoutParams(0, 0);
+
   private boolean mContainsImages;
+  private int mDefaultGravityHorizontal;
+  private int mDefaultGravityVertical;
+  private boolean mTextIsSelectable;
+  private float mLineHeight = Float.NaN;
+  private int mTextAlign = Gravity.NO_GRAVITY;
+  private int mNumberOfLines = ViewDefaults.NUMBER_OF_LINES;
+  private TextUtils.TruncateAt mEllipsizeLocation = TextUtils.TruncateAt.END;
+
+  private ReactViewBackgroundManager mReactBackgroundManager;
 
   public ReactTextView(Context context) {
     super(context);
+    mReactBackgroundManager = new ReactViewBackgroundManager(this);
+    mDefaultGravityHorizontal =
+      getGravity() & (Gravity.HORIZONTAL_GRAVITY_MASK | Gravity.RELATIVE_HORIZONTAL_GRAVITY_MASK);
+    mDefaultGravityVertical = getGravity() & Gravity.VERTICAL_GRAVITY_MASK;
   }
 
   public void setText(ReactTextUpdate update) {
     mContainsImages = update.containsImages();
+    // Android's TextView crashes when it tries to relayout if LayoutParams are
+    // null; explicitly set the LayoutParams to prevent this crash. See:
+    // https://github.com/facebook/react-native/pull/7011
+    if (getLayoutParams() == null) {
+      setLayoutParams(EMPTY_LAYOUT_PARAMS);
+    }
     setText(update.getText());
+    setPadding(
+      (int) Math.floor(update.getPaddingLeft()),
+      (int) Math.floor(update.getPaddingTop()),
+      (int) Math.floor(update.getPaddingRight()),
+      (int) Math.floor(update.getPaddingBottom()));
+
+    int nextTextAlign = update.getTextAlign();
+    if (mTextAlign != nextTextAlign) {
+      mTextAlign = nextTextAlign;
+    }
+    setGravityHorizontal(mTextAlign);
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+      if (getBreakStrategy() != update.getTextBreakStrategy()) {
+        setBreakStrategy(update.getTextBreakStrategy());
+      }
+    }
   }
 
   @Override
@@ -39,6 +83,11 @@ public class ReactTextView extends TextView implements ReactCompoundView {
     int y = (int) touchY;
 
     Layout layout = getLayout();
+    if (layout == null) {
+      // If the layout is null, the view hasn't been properly laid out yet. Therefore, we can't find
+      // the exact text tag that has been touched, and the correct tag to return is the default one.
+      return target;
+    }
     int line = layout.getLineForVertical(y);
 
     int lineStartX = (int) layout.getLineLeft(line);
@@ -68,6 +117,12 @@ public class ReactTextView extends TextView implements ReactCompoundView {
     }
 
     return target;
+  }
+
+  @Override
+  public void setTextIsSelectable(boolean selectable) {
+    mTextIsSelectable = selectable;
+    super.setTextIsSelectable(selectable);
   }
 
   @Override
@@ -144,5 +199,61 @@ public class ReactTextView extends TextView implements ReactCompoundView {
         span.onFinishTemporaryDetach();
       }
     }
+  }
+
+  /* package */ void setGravityHorizontal(int gravityHorizontal) {
+    if (gravityHorizontal == 0) {
+      gravityHorizontal = mDefaultGravityHorizontal;
+    }
+    setGravity(
+      (getGravity() & ~Gravity.HORIZONTAL_GRAVITY_MASK &
+        ~Gravity.RELATIVE_HORIZONTAL_GRAVITY_MASK) | gravityHorizontal);
+  }
+
+  /* package */ void setGravityVertical(int gravityVertical) {
+    if (gravityVertical == 0) {
+      gravityVertical = mDefaultGravityVertical;
+    }
+    setGravity((getGravity() & ~Gravity.VERTICAL_GRAVITY_MASK) | gravityVertical);
+  }
+
+  public void setNumberOfLines(int numberOfLines) {
+    mNumberOfLines = numberOfLines == 0 ? ViewDefaults.NUMBER_OF_LINES : numberOfLines;
+    setSingleLine(mNumberOfLines == 1);
+    setMaxLines(mNumberOfLines);
+  }
+
+  public void setEllipsizeLocation(TextUtils.TruncateAt ellipsizeLocation) {
+    mEllipsizeLocation = ellipsizeLocation;
+  }
+
+  public void updateView() {
+    @Nullable TextUtils.TruncateAt ellipsizeLocation = mNumberOfLines == ViewDefaults.NUMBER_OF_LINES ? null : mEllipsizeLocation;
+    setEllipsize(ellipsizeLocation);
+  }
+
+  @Override
+  public void setBackgroundColor(int color) {
+    mReactBackgroundManager.setBackgroundColor(color);
+  }
+
+  public void setBorderWidth(int position, float width) {
+    mReactBackgroundManager.setBorderWidth(position, width);
+  }
+
+  public void setBorderColor(int position, float color, float alpha) {
+    mReactBackgroundManager.setBorderColor(position, color, alpha);
+  }
+
+  public void setBorderRadius(float borderRadius) {
+    mReactBackgroundManager.setBorderRadius(borderRadius);
+  }
+
+  public void setBorderRadius(float borderRadius, int position) {
+    mReactBackgroundManager.setBorderRadius(borderRadius, position);
+  }
+
+  public void setBorderStyle(@Nullable String style) {
+    mReactBackgroundManager.setBorderStyle(style);
   }
 }

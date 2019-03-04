@@ -7,28 +7,35 @@
  * of patent rights can be found in the PATENTS file in the same directory.
  *
  * @flow
+ * @providesModule IntegrationTestHarnessTest
  */
 'use strict';
 
-var requestAnimationFrame = require('requestAnimationFrame');
-var React = require('react-native');
+/* $FlowFixMe(>=0.54.0 site=react_native_oss) This comment suppresses an error
+ * found when Flow v0.54 was deployed. To see the error delete this comment and
+ * run Flow. */
+var requestAnimationFrame = require('fbjs/lib/requestAnimationFrame');
+var React = require('react');
+var PropTypes = require('prop-types');
+var ReactNative = require('react-native');
 var {
   Text,
   View,
-} = React;
-var { TestModule } = React.NativeModules;
+} = ReactNative;
+var { TestModule } = ReactNative.NativeModules;
 
-var IntegrationTestHarnessTest = React.createClass({
-  propTypes: {
-    shouldThrow: React.PropTypes.bool,
-    waitOneFrame: React.PropTypes.bool,
-  },
+class IntegrationTestHarnessTest extends React.Component<{
+  shouldThrow?: boolean,
+  waitOneFrame?: boolean,
+}, $FlowFixMeState> {
+  static propTypes = {
+    shouldThrow: PropTypes.bool,
+    waitOneFrame: PropTypes.bool,
+  };
 
-  getInitialState() {
-    return {
-      done: false,
-    };
-  },
+  state = {
+    done: false,
+  };
 
   componentDidMount() {
     if (this.props.waitOneFrame) {
@@ -36,9 +43,9 @@ var IntegrationTestHarnessTest = React.createClass({
     } else {
       this.runTest();
     }
-  },
+  }
 
-  runTest() {
+  runTest = () => {
     if (this.props.shouldThrow) {
       throw new Error('Throwing error because shouldThrow');
     }
@@ -47,20 +54,26 @@ var IntegrationTestHarnessTest = React.createClass({
     } else if (!TestModule.markTestCompleted) {
       throw new Error('RCTTestModule.markTestCompleted not defined.');
     }
-    this.setState({done: true}, TestModule.markTestCompleted);
-  },
+    this.setState({done: true}, () => {
+      TestModule.markTestCompleted();
+    });
+  };
 
   render() {
     return (
       <View style={{backgroundColor: 'white', padding: 40}}>
         <Text>
-          {this.constructor.displayName + ': '}
+          {
+            /* $FlowFixMe(>=0.54.0 site=react_native_fb,react_native_oss) This
+             * comment suppresses an error found when Flow v0.54 was deployed.
+             * To see the error delete this comment and run Flow. */
+            this.constructor.displayName + ': '}
           {this.state.done ? 'Done' : 'Testing...'}
         </Text>
       </View>
     );
   }
-});
+}
 
 IntegrationTestHarnessTest.displayName = 'IntegrationTestHarnessTest';
 

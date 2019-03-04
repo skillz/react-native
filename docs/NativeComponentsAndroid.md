@@ -4,7 +4,9 @@ title: Native UI Components
 layout: docs
 category: Guides (Android)
 permalink: docs/native-components-android.html
-next: running-on-device-android
+banner: ejected
+next: custom-webview-android
+previous: native-modules-android
 ---
 
 There are tons of native UI widgets out there ready to be used in the latest apps - some of them are part of the platform, others are available as third-party libraries, and still more might be in use in your very own portfolio. React Native has several of the most critical platform components already wrapped, like `ScrollView` and `TextInput`, but not all of them, and certainly not ones you might have written yourself for a previous app. Fortunately, it's quite easy to wrap up these existing components for seamless integration with your React Native application.
@@ -57,7 +59,7 @@ Views are created in the `createViewInstance` method, the view should initialize
 
 ## 3. Expose view property setters using `@ReactProp` (or `@ReactPropGroup`) annotation
 
-Properties that are to be reflected in JavaScript needs to be exposed as setter method annotated with `@ReactProp` (or `@ReactPropGroup`). Setter method should take view to be updated (of the current view type) as a first argument and property value as a second argument. Setter should be declared as a `void` method and should be `public`. Property type sent to JS is determined automatically based on the type of value argument of the setter. The following type of values are currently supported: `boolean`, `int`, `float`, `double`, `String`, `Boolean`, `Integer`, `ReadableArray`, `ReadableMap`. 
+Properties that are to be reflected in JavaScript needs to be exposed as setter method annotated with `@ReactProp` (or `@ReactPropGroup`). Setter method should take view to be updated (of the current view type) as a first argument and property value as a second argument. Setter should be declared as a `void` method and should be `public`. Property type sent to JS is determined automatically based on the type of value argument of the setter. The following type of values are currently supported: `boolean`, `int`, `float`, `double`, `String`, `Boolean`, `Integer`, `ReadableArray`, `ReadableMap`.
 
 Annotation `@ReactProp` has one obligatory argument `name` of type `String`. Name assigned to the `@ReactProp` annotation linked to the setter method is used to reference the property on JS side.
 
@@ -65,19 +67,19 @@ Except from `name`, `@ReactProp` annotation may take following optional argument
 
 Setter declaration requirements for methods annotated with `@ReactPropGroup` are different than for `@ReactProp`, please refer to the `@ReactPropGroup` annotation class docs for more information about it.
 
-**IMPORTANT!** in ReactJS updating the property value will result in setter method call. Note that one of the ways we can update component is by removing properties that has been set before. In that case setter method will be called as well to notify view manager that property has changed. In that case "default" value will be provided (for primitive types "default" can value can be specified using `defaultBoolean`, `defaultFloat`, etc. arguments of `@ReactProp` annotation, for complex types setter will be called with value set to `null`).
+**IMPORTANT!** in ReactJS updating the property value will result in setter method call. Note that one of the ways we can update component is by removing properties that have been set before. In that case setter method will be called as well to notify view manager that property has changed. In that case "default" value will be provided (for primitive types "default" can value can be specified using `defaultBoolean`, `defaultFloat`, etc. arguments of `@ReactProp` annotation, for complex types setter will be called with value set to `null`).
 
 ```java
   @ReactProp(name = "src")
-  public void setSrc(ReactImageView view, @Nullable String src) {
-    view.setSource(src);
+  public void setSrc(ReactImageView view, @Nullable ReadableArray sources) {
+    view.setSource(sources);
   }
-  
+
   @ReactProp(name = "borderRadius", defaultFloat = 0f)
   public void setBorderRadius(ReactImageView view, float borderRadius) {
     view.setBorderRadius(borderRadius);
   }
-  
+
   @ReactProp(name = ViewProps.RESIZE_MODE)
   public void setResizeMode(ReactImageView view, @Nullable String resizeMode) {
     view.setScaleType(ImageResizeMode.toScaleType(resizeMode));
@@ -86,7 +88,7 @@ Setter declaration requirements for methods annotated with `@ReactPropGroup` are
 
 ## 4. Register the `ViewManager`
 
-The final Java step is to register the ViewManager to the application, this happens in a similar way to [Native Modules](native-modules-android.html), via the applications package member function `createViewManagers.`
+The final Java step is to register the ViewManager to the application, this happens in a similar way to [Native Modules](docs/native-modules-android.html), via the applications package member function `createViewManagers.`
 
 ```java
   @Override
@@ -105,7 +107,8 @@ The very final step is to create the JavaScript module that defines the interfac
 ```js
 // ImageView.js
 
-var { requireNativeComponent, PropTypes } = require('react-native');
+import PropTypes from 'prop-types';
+import { requireNativeComponent, View } from 'react-native';
 
 var iface = {
   name: 'ImageView',
@@ -113,6 +116,7 @@ var iface = {
     src: PropTypes.string,
     borderRadius: PropTypes.number,
     resizeMode: PropTypes.oneOf(['cover', 'contain', 'stretch']),
+    ...View.propTypes // include the default view properties
   },
 };
 
@@ -140,13 +144,31 @@ class MyCustomView extends View {
 }
 ```
 
-The event name `topChange` maps to the `onChange` callback prop in JavaScript (mappings are in `UIManagerModuleConstants.java`). This callback is invoked with the raw event, which we typically process in the wrapper component to make a simpler API:
+To map the `topChange` event name to the `onChange` callback prop in JavaScript, register it by overriding the `getExportedCustomBubblingEventTypeConstants` method in your `ViewManager`:
+
+```java
+public class ReactImageManager extends SimpleViewManager<MyCustomView> {
+    ...
+    public Map getExportedCustomBubblingEventTypeConstants() {
+        return MapBuilder.builder()
+            .put(
+                "topChange",
+                MapBuilder.of(
+                    "phasedRegistrationNames",
+                    MapBuilder.of("bubbled", "onChange")))
+                    .build();
+    }
+}
+```
+
+This callback is invoked with the raw event, which we typically process in the wrapper component to make a simpler API:
 
 ```js
 // MyCustomView.js
 
 class MyCustomView extends React.Component {
-  constructor() {
+  constructor(props) {
+    super(props);
     this._onChange = this._onChange.bind(this);
   }
   _onChange(event: Event) {
@@ -163,7 +185,7 @@ MyCustomView.propTypes = {
   /**
    * Callback that is called continuously when the user is dragging the map.
    */
-  onChangeMessage: React.PropTypes.func,
+  onChangeMessage: PropTypes.func,
   ...
 };
 

@@ -8,7 +8,6 @@
  */
 'use strict';
 
-jest.dontMock('deepDiffer');
 var deepDiffer = require('deepDiffer');
 
 describe('deepDiffer', function() {

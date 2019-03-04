@@ -12,29 +12,22 @@ package com.facebook.react.modules.clipboard;
 import android.annotation.SuppressLint;
 import android.content.ClipboardManager;
 import android.content.ClipData;
+import android.content.Context;
 import android.os.Build;
 
-import com.facebook.common.logging.FLog;
-import com.facebook.react.bridge.Callback;
-import com.facebook.react.bridge.NativeModule;
-import com.facebook.react.bridge.ReactApplicationContext;
-import com.facebook.react.bridge.ReactContext;
-import com.facebook.react.bridge.ReactContextBaseJavaModule;
+import com.facebook.react.bridge.ContextBaseJavaModule;
 import com.facebook.react.bridge.ReactMethod;
-import com.facebook.react.common.ReactConstants;
-
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import com.facebook.react.bridge.Promise;
+import com.facebook.react.module.annotations.ReactModule;
 
 /**
  * A module that allows JS to get/set clipboard contents.
  */
-public class ClipboardModule extends ReactContextBaseJavaModule {
+@ReactModule(name = "Clipboard")
+public class ClipboardModule extends ContextBaseJavaModule {
 
-  public ClipboardModule(ReactApplicationContext reactContext) {
-    super(reactContext);
+  public ClipboardModule(Context context) {
+    super(context);
   }
 
   @Override
@@ -43,35 +36,30 @@ public class ClipboardModule extends ReactContextBaseJavaModule {
   }
 
   private ClipboardManager getClipboardService() {
-    ReactApplicationContext reactContext = getReactApplicationContext(); 
-    return (ClipboardManager) reactContext.getSystemService(reactContext.CLIPBOARD_SERVICE);
+    return (ClipboardManager) getContext().getSystemService(getContext().CLIPBOARD_SERVICE);
   }
 
   @ReactMethod
-  public void getString(Callback cb) {
+  public void getString(Promise promise) {
     try {
       ClipboardManager clipboard = getClipboardService();
       ClipData clipData = clipboard.getPrimaryClip();
       if (clipData == null) {
-        cb.invoke("");
-        return;
-      }
-      if (clipData.getItemCount() >= 1) {
+        promise.resolve("");
+      } else if (clipData.getItemCount() >= 1) {
         ClipData.Item firstItem = clipboard.getPrimaryClip().getItemAt(0);
-        String text = "" + firstItem.getText();
-        cb.invoke(text);
+        promise.resolve("" + firstItem.getText());
       } else {
-        cb.invoke("");
+        promise.resolve("");
       }
-    } catch(Exception e) {
-      FLog.w(ReactConstants.TAG, "Cannot get clipboard contents: " + e.getMessage());
+    } catch (Exception e) {
+      promise.reject(e);
     }
   }
 
   @SuppressLint("DeprecatedMethod")
   @ReactMethod
   public void setString(String text) {
-    ReactApplicationContext reactContext = getReactApplicationContext();
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.HONEYCOMB) {
       ClipData clipdata = ClipData.newPlainText(null, text);
       ClipboardManager clipboard = getClipboardService();

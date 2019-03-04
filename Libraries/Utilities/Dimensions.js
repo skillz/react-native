@@ -11,40 +11,67 @@
  */
 'use strict';
 
-var UIManager = require('UIManager');
+var DeviceInfo = require('DeviceInfo');
+var EventEmitter = require('EventEmitter');
+var Platform = require('Platform');
+var RCTDeviceEventEmitter = require('RCTDeviceEventEmitter');
 
-var invariant = require('invariant');
+var invariant = require('fbjs/lib/invariant');
 
-var dimensions = UIManager.Dimensions;
-
-// We calculate the window dimensions in JS so that we don't encounter loss of
-// precision in transferring the dimensions (which could be non-integers) over
-// the bridge.
-if (dimensions && dimensions.windowPhysicalPixels) {
-  // parse/stringify => Clone hack
-  dimensions = JSON.parse(JSON.stringify(dimensions));
-
-  var windowPhysicalPixels = dimensions.windowPhysicalPixels;
-  dimensions.window = {
-    width: windowPhysicalPixels.width / windowPhysicalPixels.scale,
-    height: windowPhysicalPixels.height / windowPhysicalPixels.scale,
-    scale: windowPhysicalPixels.scale,
-    fontScale: windowPhysicalPixels.fontScale,
-  };
-
-  // delete so no callers rely on this existing
-  delete dimensions.windowPhysicalPixels;
-}
-
+var eventEmitter = new EventEmitter();
+var dimensionsInitialized = false;
+var dimensions = {};
 class Dimensions {
   /**
-   * This should only be called from native code.
+   * This should only be called from native code by sending the
+   * didUpdateDimensions event.
    *
    * @param {object} dims Simple string-keyed object of dimensions to set
    */
-  static set(dims: {[key:string]: any}): bool {
+  static set(dims: {[key:string]: any}): void {
+    // We calculate the window dimensions in JS so that we don't encounter loss of
+    // precision in transferring the dimensions (which could be non-integers) over
+    // the bridge.
+    if (dims && dims.windowPhysicalPixels) {
+      // parse/stringify => Clone hack
+      dims = JSON.parse(JSON.stringify(dims));
+
+      var windowPhysicalPixels = dims.windowPhysicalPixels;
+      dims.window = {
+        width: windowPhysicalPixels.width / windowPhysicalPixels.scale,
+        height: windowPhysicalPixels.height / windowPhysicalPixels.scale,
+        scale: windowPhysicalPixels.scale,
+        fontScale: windowPhysicalPixels.fontScale,
+      };
+      if (Platform.OS === 'android') {
+        // Screen and window dimensions are different on android
+        var screenPhysicalPixels = dims.screenPhysicalPixels;
+        dims.screen = {
+          width: screenPhysicalPixels.width / screenPhysicalPixels.scale,
+          height: screenPhysicalPixels.height / screenPhysicalPixels.scale,
+          scale: screenPhysicalPixels.scale,
+          fontScale: screenPhysicalPixels.fontScale,
+        };
+
+        // delete so no callers rely on this existing
+        delete dims.screenPhysicalPixels;
+      } else {
+        dims.screen = dims.window;
+      }
+      // delete so no callers rely on this existing
+      delete dims.windowPhysicalPixels;
+    }
+
     Object.assign(dimensions, dims);
-    return true;
+    if (dimensionsInitialized) {
+      // Don't fire 'change' the first time the dimensions are set.
+      eventEmitter.emit('change', {
+        window: dimensions.window,
+        screen: dimensions.screen
+      });
+    } else {
+      dimensionsInitialized = true;
+    }
   }
 
   /**
@@ -66,6 +93,44 @@ class Dimensions {
     invariant(dimensions[dim], 'No dimension set for key ' + dim);
     return dimensions[dim];
   }
+
+  /**
+   * Add an event handler. Supported events:
+   *
+   * - `change`: Fires when a property within the `Dimensions` object changes. The argument
+   *   to the event handler is an object with `window` and `screen` properties whose values
+   *   are the same as the return values of `Dimensions.get('window')` and
+   *   `Dimensions.get('screen')`, respectively.
+   */
+  static addEventListener(
+    type: string,
+    handler: Function
+  ) {
+    invariant(
+      type === 'change',
+      'Trying to subscribe to unknown event: "%s"', type
+    );
+    eventEmitter.addListener(type, handler);
+  }
+
+  /**
+   * Remove an event handler.
+   */
+  static removeEventListener(
+    type: string,
+    handler: Function
+  ) {
+    invariant(
+      type === 'change',
+      'Trying to remove listener for unknown event: "%s"', type
+    );
+    eventEmitter.removeListener(type, handler);
+  }
 }
+
+Dimensions.set(DeviceInfo.Dimensions);
+RCTDeviceEventEmitter.addListener('didUpdateDimensions', function(update) {
+  Dimensions.set(update);
+});
 
 module.exports = Dimensions;

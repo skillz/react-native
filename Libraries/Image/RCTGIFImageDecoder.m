@@ -10,10 +10,9 @@
 #import "RCTGIFImageDecoder.h"
 
 #import <ImageIO/ImageIO.h>
-#import <MobileCoreServices/MobileCoreServices.h>
 #import <QuartzCore/QuartzCore.h>
 
-#import "RCTUtils.h"
+#import <React/RCTUtils.h>
 
 @implementation RCTGIFImageDecoder
 
@@ -30,7 +29,7 @@ RCT_EXPORT_MODULE()
 - (RCTImageLoaderCancellationBlock)decodeImageData:(NSData *)imageData
                                               size:(CGSize)size
                                              scale:(CGFloat)scale
-                                        resizeMode:(UIViewContentMode)resizeMode
+                                        resizeMode:(RCTResizeMode)resizeMode
                                  completionHandler:(RCTImageLoaderCompletionBlock)completionHandler
 {
   CGImageSourceRef imageSource = CGImageSourceCreateWithData((CFDataRef)imageData, NULL);
@@ -91,6 +90,7 @@ RCT_EXPORT_MODULE()
     animation.keyTimes = keyTimes;
     animation.values = images;
     animation.duration = duration;
+    animation.removedOnCompletion = NO;
     image.reactKeyframeAnimation = animation;
 
   } else {

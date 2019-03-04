@@ -8,9 +8,6 @@
  */
 'use strict';
 
-jest.dontMock('MatrixMath');
-jest.dontMock('invariant');
-
 var MatrixMath = require('MatrixMath');
 
 function degreesToRadians(degrees) {

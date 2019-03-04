@@ -32,7 +32,9 @@ RCT_ENUM_CONVERTER(UITabBarSystemItem, (@{
 
 @end
 
-@implementation RCTTabBarItem
+@implementation RCTTabBarItem{
+  UITapGestureRecognizer *_selectRecognizer;
+}
 
 @synthesize barItem = _barItem;
 
@@ -40,6 +42,9 @@ RCT_ENUM_CONVERTER(UITabBarSystemItem, (@{
 {
   if ((self = [super initWithFrame:frame])) {
     _systemIcon = NSNotFound;
+#if TARGET_OS_TV
+    _wasSelectedInJS = NO;
+#endif
   }
   return self;
 }
@@ -84,12 +89,48 @@ RCT_ENUM_CONVERTER(UITabBarSystemItem, (@{
     _barItem.selectedImage = oldItem.selectedImage;
     _barItem.badgeValue = oldItem.badgeValue;
   }
-  self.barItem.image = _icon;
+
+  if (_renderAsOriginal) {
+    self.barItem.image = [_icon imageWithRenderingMode:UIImageRenderingModeAlwaysOriginal];
+  } else {
+    self.barItem.image = _icon;
+  }
+}
+
+- (void)setSelectedIcon:(UIImage *)selectedIcon
+{
+  _selectedIcon = selectedIcon;
+
+  if (_renderAsOriginal) {
+    self.barItem.selectedImage = [_selectedIcon imageWithRenderingMode:UIImageRenderingModeAlwaysOriginal];
+  } else {
+    self.barItem.selectedImage = _selectedIcon;
+  }
+}
+
+- (void)setBadgeColor:(UIColor *)badgeColor
+{
+  // badgeColor available since iOS 10
+  if ([self.barItem respondsToSelector:@selector(badgeColor)]) {
+    self.barItem.badgeColor = badgeColor;
+  }
 }
 
 - (UIViewController *)reactViewController
 {
   return self.superview.reactViewController;
 }
+
+#if TARGET_OS_TV
+
+// On Apple TV, we let native control the tab bar selection after initial render
+- (void)setSelected:(BOOL)selected
+{
+  if (!_wasSelectedInJS) {
+    _selected = selected;
+  }
+}
+
+#endif
 
 @end

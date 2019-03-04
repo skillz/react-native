@@ -13,25 +13,17 @@
  */
 'use strict';
 
-export type ResolvedAssetSource = {
-  __packager_asset: boolean,
-  width: number,
-  height: number,
-  uri: string,
-  scale: number,
-};
+const AssetRegistry = require('AssetRegistry');
+const AssetSourceResolver = require('AssetSourceResolver');
+const NativeModules = require('NativeModules');
 
-var AssetRegistry = require('AssetRegistry');
-var PixelRatio = require('PixelRatio');
-var Platform = require('Platform');
-var SourceCode = require('NativeModules').SourceCode;
-var assetPathUtils = require('../../local-cli/bundle/assetPathUtils');
+import type { ResolvedAssetSource } from 'AssetSourceResolver';
 
-var _serverURL, _offlinePath;
+let _customSourceTransformer, _serverURL, _bundleSourceURL;
 
-function getDevServerURL() {
+function getDevServerURL(): ?string {
   if (_serverURL === undefined) {
-    var scriptURL = SourceCode.scriptURL;
+    var scriptURL = NativeModules.SourceCode.scriptURL;
     var match = scriptURL && scriptURL.match(/^https?:\/\/.*?\//);
     if (match) {
       // Bundle was loaded from network
@@ -41,109 +33,60 @@ function getDevServerURL() {
       _serverURL = null;
     }
   }
-
   return _serverURL;
 }
 
-function getOfflinePath() {
-  if (_offlinePath === undefined) {
-    var scriptURL = SourceCode.scriptURL;
-    var match = scriptURL && scriptURL.match(/^file:\/\/(\/.*\/)/);
-    if (match) {
-      _offlinePath = match[1];
-    } else {
-      _offlinePath = '';
+function getBundleSourceURL(): ?string {
+  if (_bundleSourceURL === undefined) {
+    const scriptURL = NativeModules.SourceCode.scriptURL;
+    if (!scriptURL) {
+      // scriptURL is falsy, we have nothing to go on here
+      _bundleSourceURL = null;
+      return _bundleSourceURL;
+    }
+    if (scriptURL.startsWith('assets://')) {
+      // android: running from within assets, no offline path to use
+      _bundleSourceURL = null;
+      return _bundleSourceURL;
+    }
+    _bundleSourceURL = scriptURL.substring(0, scriptURL.lastIndexOf('/') + 1);
+    if (!scriptURL.startsWith('file://')) {
+      // Add file protocol in case we have an absolute file path and not a URL.
+      // This shouldn't really be necessary. scriptURL should be a URL.
+      _bundleSourceURL = 'file://' + _bundleSourceURL;
     }
   }
 
-  return _offlinePath;
+  return _bundleSourceURL;
+}
+
+function setCustomSourceTransformer(
+  transformer: (resolver: AssetSourceResolver) => ResolvedAssetSource,
+): void {
+  _customSourceTransformer = transformer;
 }
 
 /**
- * Returns the path at which the asset can be found in the archive
+ * `source` is either a number (opaque type returned by require('./foo.png'))
+ * or an `ImageSource` like { uri: '<http location || file path>' }
  */
-function getPathInArchive(asset) {
-  var offlinePath = getOfflinePath();
-  if (Platform.OS === 'android') {
-    if (offlinePath) {
-      // E.g. 'file:///sdcard/AwesomeModule/drawable-mdpi/icon.png'
-      return 'file://' + offlinePath + getAssetPathInDrawableFolder(asset);
-    }
-    // E.g. 'assets_awesomemodule_icon'
-    // The Android resource system picks the correct scale.
-    return assetPathUtils.getAndroidResourceIdentifier(asset);
-  } else {
-    // E.g. '/assets/AwesomeModule/icon@2x.png'
-    return offlinePath + getScaledAssetPath(asset);
-  }
-}
-
-/**
- * Returns an absolute URL which can be used to fetch the asset
- * from the devserver
- */
-function getPathOnDevserver(devServerUrl, asset) {
-  return devServerUrl + getScaledAssetPath(asset) + '?platform=' + Platform.OS +
-    '&hash=' + asset.hash;
-}
-
-/**
- * Returns a path like 'assets/AwesomeModule/icon@2x.png'
- */
-function getScaledAssetPath(asset) {
-  var scale = pickScale(asset.scales, PixelRatio.get());
-  var scaleSuffix = scale === 1 ? '' : '@' + scale + 'x';
-  var assetDir = assetPathUtils.getBasePath(asset);
-  return assetDir + '/' + asset.name + scaleSuffix + '.' + asset.type;
-}
-
-/**
- * Returns a path like 'drawable-mdpi/icon.png'
- */
-function getAssetPathInDrawableFolder(asset) {
-  var scale = pickScale(asset.scales, PixelRatio.get());
-  var drawbleFolder = assetPathUtils.getAndroidDrawableFolderName(asset, scale);
-  var fileName =  assetPathUtils.getAndroidResourceIdentifier(asset);
-  return drawbleFolder + '/' + fileName + '.' + asset.type;
-}
-
-function pickScale(scales: Array<number>, deviceScale: number): number {
-  // Packager guarantees that `scales` array is sorted
-  for (var i = 0; i < scales.length; i++) {
-    if (scales[i] >= deviceScale) {
-      return scales[i];
-    }
-  }
-
-  // If nothing matches, device scale is larger than any available
-  // scales, so we return the biggest one. Unless the array is empty,
-  // in which case we default to 1
-  return scales[scales.length - 1] || 1;
-}
-
 function resolveAssetSource(source: any): ?ResolvedAssetSource {
   if (typeof source === 'object') {
     return source;
   }
 
   var asset = AssetRegistry.getAssetByID(source);
-  if (asset) {
-    return assetToImageSource(asset);
+  if (!asset) {
+    return null;
   }
 
-  return null;
-}
-
-function assetToImageSource(asset): ResolvedAssetSource {
-  var devServerURL = getDevServerURL();
-  return {
-    __packager_asset: true,
-    width: asset.width,
-    height: asset.height,
-    uri: devServerURL ? getPathOnDevserver(devServerURL, asset) : getPathInArchive(asset),
-    scale: pickScale(asset.scales, PixelRatio.get()),
-  };
+  const resolver = new AssetSourceResolver(getDevServerURL(), getBundleSourceURL(), asset);
+  if (_customSourceTransformer) {
+    return _customSourceTransformer(resolver);
+  }
+  return resolver.defaultAsset();
 }
 
 module.exports = resolveAssetSource;
-module.exports.pickScale = pickScale;
+module.exports.pickScale = AssetSourceResolver.pickScale;
+module.exports.setCustomSourceTransformer = setCustomSourceTransformer;

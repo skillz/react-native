@@ -9,10 +9,10 @@
 
 #import "RCTSettingsManager.h"
 
-#import "RCTBridge.h"
-#import "RCTConvert.h"
-#import "RCTEventDispatcher.h"
-#import "RCTUtils.h"
+#import <React/RCTBridge.h>
+#import <React/RCTConvert.h>
+#import <React/RCTEventDispatcher.h>
+#import <React/RCTUtils.h>
 
 @implementation RCTSettingsManager
 {
@@ -24,36 +24,38 @@
 
 RCT_EXPORT_MODULE()
 
++ (BOOL)requiresMainQueueSetup
+{
+  return NO;
+}
+
+- (instancetype)init
+{
+  return [self initWithUserDefaults:[NSUserDefaults standardUserDefaults]];
+}
+
 - (instancetype)initWithUserDefaults:(NSUserDefaults *)defaults
 {
-  if ((self = [self init])) {
+  if ((self = [super init])) {
     _defaults = defaults;
+
+
+    [[NSNotificationCenter defaultCenter] addObserver:self
+                                             selector:@selector(userDefaultsDidChange:)
+                                                 name:NSUserDefaultsDidChangeNotification
+                                               object:_defaults];
   }
   return self;
-}
-
-- (void)setBridge:(RCTBridge *)bridge
-{
-  _bridge = bridge;
-
-  if (!_defaults) {
-    _defaults = [NSUserDefaults standardUserDefaults];
-  }
-
-  [[NSNotificationCenter defaultCenter] addObserver:self
-                                           selector:@selector(userDefaultsDidChange:)
-                                               name:NSUserDefaultsDidChangeNotification
-                                             object:_defaults];
-}
-
-- (NSDictionary<NSString *, id> *)constantsToExport
-{
-  return @{@"settings": RCTJSONClean([_defaults dictionaryRepresentation])};
 }
 
 - (void)dealloc
 {
   [[NSNotificationCenter defaultCenter] removeObserver:self];
+}
+
+- (NSDictionary<NSString *, id> *)constantsToExport
+{
+  return @{@"settings": RCTJSONClean([_defaults dictionaryRepresentation])};
 }
 
 - (void)userDefaultsDidChange:(NSNotification *)note
@@ -62,9 +64,12 @@ RCT_EXPORT_MODULE()
     return;
   }
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
   [_bridge.eventDispatcher
    sendDeviceEventWithName:@"settingsUpdated"
    body:RCTJSONClean([_defaults dictionaryRepresentation])];
+#pragma clang diagnostic pop
 }
 
 /**
@@ -77,9 +82,9 @@ RCT_EXPORT_METHOD(setValues:(NSDictionary *)values)
   [values enumerateKeysAndObjectsUsingBlock:^(NSString *key, id json, BOOL *stop) {
     id plist = [RCTConvert NSPropertyList:json];
     if (plist) {
-      [_defaults setObject:plist forKey:key];
+      [self->_defaults setObject:plist forKey:key];
     } else {
-      [_defaults removeObjectForKey:key];
+      [self->_defaults removeObjectForKey:key];
     }
   }];
 

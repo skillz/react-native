@@ -1,5 +1,10 @@
 /**
- * Copyright 2004-present Facebook. All Rights Reserved.
+ * Copyright (c) 2015-present, Facebook, Inc.
+ * All rights reserved.
+ *
+ * This source code is licensed under the BSD-style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
  *
  * @providesModule MatrixMath
  * @noflow
@@ -7,7 +12,7 @@
 /* eslint-disable space-infix-ops */
 'use strict';
 
-var invariant = require('invariant');
+var invariant = require('fbjs/lib/invariant');
 
 /**
  * Memory conservative (mutative) matrix math utilities. Uses "command"
@@ -67,8 +72,14 @@ var MatrixMath = {
     ];
   },
 
+  /**
+   * This create a perspective projection towards negative z
+   * Clipping the z range of [-near, -far]
+   *
+   * @param fovInRadians - field of view in randians
+   */
   createPerspective: function(fovInRadians, aspect, near, far) {
-    var h = 1 / Math.tan(fovInRadians);
+    var h = 1 / Math.tan(fovInRadians / 2);
     var r_depth  = 1 / (near - far);
     var C = (far + near) * r_depth;
     var D = 2 * (far * near * r_depth);
@@ -159,13 +170,11 @@ var MatrixMath = {
   },
 
   reuseSkewXCommand: function(matrixCommand, radians) {
-    matrixCommand[4] = Math.sin(radians);
-    matrixCommand[5] = Math.cos(radians);
+    matrixCommand[4] = Math.tan(radians);
   },
 
   reuseSkewYCommand: function(matrixCommand, radians) {
-    matrixCommand[0] = Math.cos(radians);
-    matrixCommand[1] = Math.sin(radians);
+    matrixCommand[1] = Math.tan(radians);
   },
 
   multiplyInto: function(out, a, b) {

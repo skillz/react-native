@@ -9,17 +9,20 @@
 
 package com.facebook.react.modules.core;
 
-import java.io.File;
-
 import com.facebook.common.logging.FLog;
 import com.facebook.react.bridge.BaseJavaModule;
 import com.facebook.react.bridge.ReactMethod;
 import com.facebook.react.bridge.ReadableArray;
-import com.facebook.react.bridge.ReadableMap;
-import com.facebook.react.devsupport.DevSupportManager;
+import com.facebook.react.common.JavascriptException;
 import com.facebook.react.common.ReactConstants;
+import com.facebook.react.devsupport.interfaces.DevSupportManager;
+import com.facebook.react.module.annotations.ReactModule;
+import com.facebook.react.util.JSStackTrace;
 
+@ReactModule(name = ExceptionsManagerModule.NAME)
 public class ExceptionsManagerModule extends BaseJavaModule {
+
+  protected static final String NAME = "ExceptionsManager";
 
   private final DevSupportManager mDevSupportManager;
 
@@ -29,26 +32,7 @@ public class ExceptionsManagerModule extends BaseJavaModule {
 
   @Override
   public String getName() {
-    return "RKExceptionsManager";
-  }
-
-  private String stackTraceToString(ReadableArray stack) {
-    StringBuilder stringBuilder = new StringBuilder();
-    for (int i = 0; i < stack.size(); i++) {
-      ReadableMap frame = stack.getMap(i);
-      stringBuilder.append(frame.getString("methodName"));
-      stringBuilder.append("\n    ");
-      stringBuilder.append(new File(frame.getString("file")).getName());
-      stringBuilder.append(":");
-      stringBuilder.append(frame.getInt("lineNumber"));
-      if (frame.hasKey("column") && !frame.isNull("column")) {
-        stringBuilder
-            .append(":")
-            .append(frame.getInt("column"));
-      }
-      stringBuilder.append("\n");
-    }
-    return stringBuilder.toString();
+    return NAME;
   }
 
   @ReactMethod
@@ -58,14 +42,18 @@ public class ExceptionsManagerModule extends BaseJavaModule {
 
   @ReactMethod
   public void reportSoftException(String title, ReadableArray details, int exceptionId) {
-    FLog.e(ReactConstants.TAG, title + "\n" + stackTraceToString(details));
+    if (mDevSupportManager.getDevSupportEnabled()) {
+      mDevSupportManager.showNewJSError(title, details, exceptionId);
+    } else {
+      FLog.e(ReactConstants.TAG, JSStackTrace.format(title, details));
+    }
   }
 
   private void showOrThrowError(String title, ReadableArray details, int exceptionId) {
     if (mDevSupportManager.getDevSupportEnabled()) {
       mDevSupportManager.showNewJSError(title, details, exceptionId);
     } else {
-      throw new JavascriptException(stackTraceToString(details));
+      throw new JavascriptException(JSStackTrace.format(title, details));
     }
   }
 
@@ -73,6 +61,13 @@ public class ExceptionsManagerModule extends BaseJavaModule {
   public void updateExceptionMessage(String title, ReadableArray details, int exceptionId) {
     if (mDevSupportManager.getDevSupportEnabled()) {
       mDevSupportManager.updateJSError(title, details, exceptionId);
+    }
+  }
+
+  @ReactMethod
+  public void dismissRedbox() {
+    if (mDevSupportManager.getDevSupportEnabled()) {
+      mDevSupportManager.hideRedboxDialog();
     }
   }
 }

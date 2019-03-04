@@ -6,13 +6,14 @@
  * LICENSE file in the root directory of this source tree. An additional grant
  * of patent rights can be found in the PATENTS file in the same directory.
  *
- * @providesModule RCTRootViewIntegrationTestsApp
+ * @providesModule RCTRootViewIntegrationTestApp
  */
 'use strict';
 
-require('regenerator/runtime');
+require('regenerator-runtime/runtime');
 
-var React = require('react-native');
+var React = require('react');
+var ReactNative = require('react-native');
 
 var {
   AppRegistry,
@@ -21,7 +22,7 @@ var {
   Text,
   TouchableOpacity,
   View,
-} = React;
+} = ReactNative;
 
 /* Keep this list in sync with RCTRootViewIntegrationTests.m */
 var TESTS = [
@@ -34,13 +35,12 @@ TESTS.forEach(
   (test) => AppRegistry.registerComponent(test.displayName, () => test)
 );
 
-var RCTRootViewIntegrationTestsApp = React.createClass({
-  getInitialState: function() {
-    return {
-      test: null,
-    };
-  },
-  render: function() {
+class RCTRootViewIntegrationTestApp extends React.Component {
+  state = {
+    test: null,
+  };
+
+  render() {
     if (this.state.test) {
       return (
         <ScrollView>
@@ -71,7 +71,7 @@ var RCTRootViewIntegrationTestsApp = React.createClass({
       </View>
     );
   }
-});
+}
 
 var styles = StyleSheet.create({
   container: {
@@ -91,4 +91,4 @@ var styles = StyleSheet.create({
   },
 });
 
-AppRegistry.registerComponent('RCTRootViewIntegrationTestsApp', () => RCTRootViewIntegrationTestsApp);
+AppRegistry.registerComponent('RCTRootViewIntegrationTestApp', () => RCTRootViewIntegrationTestApp);

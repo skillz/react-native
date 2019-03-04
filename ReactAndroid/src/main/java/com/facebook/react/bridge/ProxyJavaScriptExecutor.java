@@ -11,7 +11,7 @@ package com.facebook.react.bridge;
 
 import javax.annotation.Nullable;
 
-import com.facebook.soloader.SoLoader;
+import com.facebook.jni.HybridData;
 import com.facebook.proguard.annotations.DoNotStrip;
 
 /**
@@ -24,7 +24,7 @@ import com.facebook.proguard.annotations.DoNotStrip;
  */
 @DoNotStrip
 public class ProxyJavaScriptExecutor extends JavaScriptExecutor {
-  public static class Factory implements JavaScriptExecutor.Factory {
+  public static class Factory implements JavaScriptExecutorFactory {
     private final JavaJSExecutor.Factory mJavaJSExecutorFactory;
 
     public Factory(JavaJSExecutor.Factory javaJSExecutorFactory) {
@@ -38,7 +38,7 @@ public class ProxyJavaScriptExecutor extends JavaScriptExecutor {
   }
 
   static {
-    SoLoader.loadLibrary(ReactBridge.REACT_NATIVE_LIB);
+    ReactBridge.staticInit();
   }
 
   private @Nullable JavaJSExecutor mJavaJSExecutor;
@@ -49,8 +49,8 @@ public class ProxyJavaScriptExecutor extends JavaScriptExecutor {
    * javascript calls
    */
   public ProxyJavaScriptExecutor(JavaJSExecutor executor) {
+    super(initHybrid(executor));
     mJavaJSExecutor = executor;
-    initialize(executor);
   }
 
   @Override
@@ -61,6 +61,5 @@ public class ProxyJavaScriptExecutor extends JavaScriptExecutor {
     }
   }
 
-  private native void initialize(JavaJSExecutor executor);
-
+  private native static HybridData initHybrid(JavaJSExecutor executor);
 }

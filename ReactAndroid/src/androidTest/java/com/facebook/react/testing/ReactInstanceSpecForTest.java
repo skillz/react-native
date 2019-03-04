@@ -8,15 +8,14 @@
 
 package com.facebook.react.testing;
 
-import java.util.ArrayList;
-import java.util.List;
-
 import android.annotation.SuppressLint;
-
-import com.facebook.react.bridge.NativeModule;
-import com.facebook.react.bridge.JavaScriptModule;
-import com.facebook.react.uimanager.ViewManager;
 import com.facebook.react.ReactPackage;
+import com.facebook.react.bridge.JavaScriptModule;
+import com.facebook.react.bridge.NativeModule;
+import com.facebook.react.uimanager.ViewManager;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 
 /**
  * A spec that allows a test to add additional NativeModules/JS modules to the ReactInstance. This
@@ -26,23 +25,28 @@ import com.facebook.react.ReactPackage;
 @SuppressLint("JavatestsIncorrectFolder")
 public class ReactInstanceSpecForTest {
 
-  private final List<NativeModule> mNativeModules = new ArrayList<>();
+  private final List<NativeModule> mNativeModules =
+    new ArrayList<NativeModule>(Arrays.asList(new FakeWebSocketModule()));
   private final List<Class<? extends JavaScriptModule>> mJSModuleSpecs = new ArrayList<>();
   private final List<ViewManager> mViewManagers = new ArrayList<>();
-  private ReactPackage mReactPackage = null;
+  private final ArrayList<ReactPackage> mReactPackages = new ArrayList<>();
 
   public ReactInstanceSpecForTest addNativeModule(NativeModule module) {
     mNativeModules.add(module);
     return this;
   }
 
-  public ReactInstanceSpecForTest addJSModule(Class jsClass) {
-    mJSModuleSpecs.add(jsClass);
+  public ReactInstanceSpecForTest setPackage(ReactPackage reactPackage) {
+    if (!mReactPackages.isEmpty()) {
+      throw new IllegalStateException(
+          "setPackage is not allowed after addPackages. " + reactPackage);
+    }
+    mReactPackages.add(reactPackage);
     return this;
   }
 
-  public ReactInstanceSpecForTest setPackage(ReactPackage reactPackage) {
-    mReactPackage = reactPackage;
+  public ReactInstanceSpecForTest addPackages(List<ReactPackage> reactPackages) {
+    mReactPackages.addAll(reactPackages);
     return this;
   }
 
@@ -55,12 +59,16 @@ public class ReactInstanceSpecForTest {
     return mNativeModules;
   }
 
-  public List<Class<? extends JavaScriptModule>> getExtraJSModulesForTest() {
-    return mJSModuleSpecs;
+  public ReactPackage getAlternativeReactPackageForTest() {
+    if (mReactPackages.size() > 1) {
+      throw new IllegalStateException(
+          "Multiple packages were added - use getAlternativeReactPackagesForTest instead.");
+    }
+    return mReactPackages.get(0);
   }
 
-  public ReactPackage getAlternativeReactPackageForTest() {
-    return mReactPackage;
+  public List<ReactPackage> getAlternativeReactPackagesForTest() {
+    return mReactPackages;
   }
 
   public List<ViewManager> getExtraViewManagers() {

@@ -38,15 +38,25 @@ function deepFreezeAndThrowOnMutationInDev(object: Object) {
       return;
     }
 
-    for (var key in object) {
+    var keys = Object.keys(object);
+
+    for (var i = 0; i < keys.length; i++) {
+      var key = keys[i];
       if (object.hasOwnProperty(key)) {
         object.__defineGetter__(key, identity.bind(null, object[key]));
         object.__defineSetter__(key, throwOnImmutableMutation.bind(null, key));
+      }
+    }
+
+    Object.freeze(object);
+    Object.seal(object);
+
+    for (var i = 0; i < keys.length; i++) {
+      var key = keys[i];
+      if (object.hasOwnProperty(key)) {
         deepFreezeAndThrowOnMutationInDev(object[key]);
       }
     }
-    Object.freeze(object);
-    Object.seal(object);
   }
 }
 

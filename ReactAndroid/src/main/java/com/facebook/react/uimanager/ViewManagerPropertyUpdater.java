@@ -13,15 +13,15 @@ import com.facebook.react.bridge.ReadableMapKeySetIterator;
 
 public class ViewManagerPropertyUpdater {
   public interface Settable {
-    Map<String, String> getProperties();
+     void getProperties(Map<String, String> props);
   }
 
   public interface ViewManagerSetter<T extends ViewManager, V extends View> extends Settable {
-    void setProperty(T manager, V view, String name, CatalystStylesDiffMap props);
+    void setProperty(T manager, V view, String name, ReactStylesDiffMap props);
   }
 
   public interface ShadowNodeSetter<T extends ReactShadowNode> extends Settable {
-    void setProperty(T node, String name, CatalystStylesDiffMap props);
+    void setProperty(T node, String name, ReactStylesDiffMap props);
   }
 
   private static final String TAG = "ViewManagerPropertyUpdater";
@@ -30,10 +30,16 @@ public class ViewManagerPropertyUpdater {
       new HashMap<>();
   private static final Map<Class<?>, ShadowNodeSetter<?>> SHADOW_NODE_SETTER_MAP = new HashMap<>();
 
+  public static void clear() {
+    ViewManagersPropertyCache.clear();
+    VIEW_MANAGER_SETTER_MAP.clear();
+    SHADOW_NODE_SETTER_MAP.clear();
+  }
+
   public static <T extends ViewManager, V extends View> void updateProps(
       T manager,
       V v,
-      CatalystStylesDiffMap props) {
+      ReactStylesDiffMap props) {
     ViewManagerSetter<T, V> setter = findManagerSetter(manager.getClass());
     ReadableMap propMap = props.mBackingMap;
     ReadableMapKeySetIterator iterator = propMap.keySetIterator();
@@ -43,7 +49,7 @@ public class ViewManagerPropertyUpdater {
     }
   }
 
-  public static <T extends ReactShadowNode> void updateProps(T node, CatalystStylesDiffMap props) {
+  public static <T extends ReactShadowNode> void updateProps(T node, ReactStylesDiffMap props) {
     ShadowNodeSetter<T> setter = findNodeSetter(node.getClass());
     ReadableMap propMap = props.mBackingMap;
     ReadableMapKeySetIterator iterator = propMap.keySetIterator();
@@ -57,8 +63,8 @@ public class ViewManagerPropertyUpdater {
       Class<? extends ViewManager> viewManagerTopClass,
       Class<? extends ReactShadowNode> shadowNodeTopClass) {
     Map<String, String> props = new HashMap<>();
-    props.putAll(findManagerSetter(viewManagerTopClass).getProperties());
-    props.putAll(findNodeSetter(shadowNodeTopClass).getProperties());
+    findManagerSetter(viewManagerTopClass).getProperties(props);
+    findNodeSetter(shadowNodeTopClass).getProperties(props);
     return props;
   }
 
@@ -117,7 +123,7 @@ public class ViewManagerPropertyUpdater {
     }
 
     @Override
-    public void setProperty(T manager, V v, String name, CatalystStylesDiffMap props) {
+    public void setProperty(T manager, V v, String name, ReactStylesDiffMap props) {
       ViewManagersPropertyCache.PropSetter setter = mPropSetters.get(name);
       if (setter != null) {
         setter.updateViewProp(manager, v, props);
@@ -125,12 +131,10 @@ public class ViewManagerPropertyUpdater {
     }
 
     @Override
-    public Map<String, String> getProperties() {
-      Map<String, String> nativeProps = new HashMap<>();
+    public void getProperties(Map<String, String> props) {
       for (ViewManagersPropertyCache.PropSetter setter : mPropSetters.values()) {
-        nativeProps.put(setter.getPropName(), setter.getPropType());
+        props.put(setter.getPropName(), setter.getPropType());
       }
-      return nativeProps;
     }
   }
 
@@ -144,7 +148,7 @@ public class ViewManagerPropertyUpdater {
     }
 
     @Override
-    public void setProperty(ReactShadowNode node, String name, CatalystStylesDiffMap props) {
+    public void setProperty(ReactShadowNode node, String name, ReactStylesDiffMap props) {
       ViewManagersPropertyCache.PropSetter setter = mPropSetters.get(name);
       if (setter != null) {
         setter.updateShadowNodeProp(node, props);
@@ -152,12 +156,10 @@ public class ViewManagerPropertyUpdater {
     }
 
     @Override
-    public Map<String, String> getProperties() {
-      Map<String, String> nativeProps = new HashMap<>();
+    public void getProperties(Map<String, String> props) {
       for (ViewManagersPropertyCache.PropSetter setter : mPropSetters.values()) {
-        nativeProps.put(setter.getPropName(), setter.getPropType());
+        props.put(setter.getPropName(), setter.getPropType());
       }
-      return nativeProps;
     }
   }
 }

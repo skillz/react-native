@@ -9,28 +9,28 @@
 
 package com.facebook.react.uimanager;
 
-import javax.annotation.Nullable;
-
-import java.util.Map;
-
 import android.view.View;
-
+import com.facebook.react.bridge.BaseJavaModule;
+import com.facebook.react.bridge.ReactApplicationContext;
 import com.facebook.react.bridge.ReadableArray;
-import com.facebook.react.touch.CatalystInterceptingViewGroup;
 import com.facebook.react.touch.JSResponderHandler;
+import com.facebook.react.touch.ReactInterceptingViewGroup;
 import com.facebook.react.uimanager.annotations.ReactProp;
 import com.facebook.react.uimanager.annotations.ReactPropGroup;
 import com.facebook.react.uimanager.annotations.ReactPropertyHolder;
+import java.util.Map;
+import javax.annotation.Nullable;
 
 /**
  * Class responsible for knowing how to create and update catalyst Views of a given type. It is also
- * responsible for creating and updating CSSNode subclasses used for calculating position and size
+ * responsible for creating and updating CSSNodeDEPRECATED subclasses used for calculating position and size
  * for the corresponding native view.
  */
 @ReactPropertyHolder
-public abstract class ViewManager<T extends View, C extends ReactShadowNode> {
+public abstract class ViewManager<T extends View, C extends ReactShadowNode>
+  extends BaseJavaModule {
 
-  public final void updateProperties(T viewToUpdate, CatalystStylesDiffMap props) {
+  public final void updateProperties(T viewToUpdate, ReactStylesDiffMap props) {
     ViewManagerPropertyUpdater.updateProps(this, viewToUpdate, props);
     onAfterUpdateTransaction(viewToUpdate);
   }
@@ -43,8 +43,8 @@ public abstract class ViewManager<T extends View, C extends ReactShadowNode> {
       JSResponderHandler jsResponderHandler) {
     T view = createViewInstance(reactContext);
     addEventEmitters(reactContext, view);
-    if (view instanceof CatalystInterceptingViewGroup) {
-      ((CatalystInterceptingViewGroup) view).setOnInterceptTouchEventListener(jsResponderHandler);
+    if (view instanceof ReactInterceptingViewGroup) {
+      ((ReactInterceptingViewGroup) view).setOnInterceptTouchEventListener(jsResponderHandler);
     }
     return view;
   }
@@ -60,7 +60,13 @@ public abstract class ViewManager<T extends View, C extends ReactShadowNode> {
    * measuring position and size of the view. In mose of the cases this should just return an
    * instance of {@link ReactShadowNode}
    */
-  public abstract C createShadowNodeInstance();
+  public C createShadowNodeInstance() {
+    throw new RuntimeException("ViewManager subclasses must implement createShadowNodeInstance()");
+  }
+
+  public C createShadowNodeInstance(ReactApplicationContext context) {
+    return createShadowNodeInstance();
+  }
 
   /**
    * This method should return {@link Class} instance that represent type of shadow node that this

@@ -16,8 +16,10 @@ var ImageStylePropTypes = require('ImageStylePropTypes');
 var TextStylePropTypes = require('TextStylePropTypes');
 var ViewStylePropTypes = require('ViewStylePropTypes');
 
-var keyMirror = require('keyMirror');
-var matricesDiffer = require('matricesDiffer');
+/* $FlowFixMe(>=0.54.0 site=react_native_oss) This comment suppresses an error
+ * found when Flow v0.54 was deployed. To see the error delete this comment and
+ * run Flow. */
+var keyMirror = require('fbjs/lib/keyMirror');
 var processColor = require('processColor');
 var processTransform = require('processTransform');
 var sizesDiffer = require('sizesDiffer');
@@ -29,11 +31,7 @@ var ReactNativeStyleAttributes = {
 };
 
 ReactNativeStyleAttributes.transform = { process: processTransform };
-ReactNativeStyleAttributes.transformMatrix = { diff: matricesDiffer };
 ReactNativeStyleAttributes.shadowOffset = { diff: sizesDiffer };
-
-// Do not rely on this attribute.
-ReactNativeStyleAttributes.decomposedMatrix = 'decomposedMatrix';
 
 var colorAttributes = { process: processColor };
 ReactNativeStyleAttributes.backgroundColor = colorAttributes;
@@ -42,10 +40,13 @@ ReactNativeStyleAttributes.borderColor = colorAttributes;
 ReactNativeStyleAttributes.borderLeftColor = colorAttributes;
 ReactNativeStyleAttributes.borderRightColor = colorAttributes;
 ReactNativeStyleAttributes.borderTopColor = colorAttributes;
+ReactNativeStyleAttributes.borderStartColor = colorAttributes;
+ReactNativeStyleAttributes.borderEndColor = colorAttributes;
 ReactNativeStyleAttributes.color = colorAttributes;
 ReactNativeStyleAttributes.shadowColor = colorAttributes;
 ReactNativeStyleAttributes.textDecorationColor = colorAttributes;
 ReactNativeStyleAttributes.tintColor = colorAttributes;
 ReactNativeStyleAttributes.textShadowColor = colorAttributes;
+ReactNativeStyleAttributes.overlayColor = colorAttributes;
 
 module.exports = ReactNativeStyleAttributes;

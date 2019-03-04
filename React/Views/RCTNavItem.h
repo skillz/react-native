@@ -9,15 +9,18 @@
 
 #import <UIKit/UIKit.h>
 
-#import "RCTComponent.h"
+#import <React/RCTComponent.h>
 
 @interface RCTNavItem : UIView
 
 @property (nonatomic, copy) NSString *title;
+@property (nonatomic, strong) UIImage *titleImage;
 @property (nonatomic, strong) UIImage *leftButtonIcon;
 @property (nonatomic, copy) NSString *leftButtonTitle;
+@property (nonatomic, assign) UIBarButtonSystemItem leftButtonSystemIcon;
 @property (nonatomic, strong) UIImage *rightButtonIcon;
 @property (nonatomic, copy) NSString *rightButtonTitle;
+@property (nonatomic, assign) UIBarButtonSystemItem rightButtonSystemIcon;
 @property (nonatomic, strong) UIImage *backButtonIcon;
 @property (nonatomic, copy) NSString *backButtonTitle;
 @property (nonatomic, assign) BOOL navigationBarHidden;
@@ -26,7 +29,11 @@
 @property (nonatomic, strong) UIColor *barTintColor;
 @property (nonatomic, strong) UIColor *titleTextColor;
 @property (nonatomic, assign) BOOL translucent;
+#if !TARGET_OS_TV
+@property (nonatomic, assign) UIBarStyle barStyle;
+#endif
 
+@property (nonatomic, readonly) UIImageView *titleImageView;
 @property (nonatomic, readonly) UIBarButtonItem *backButtonItem;
 @property (nonatomic, readonly) UIBarButtonItem *leftButtonItem;
 @property (nonatomic, readonly) UIBarButtonItem *rightButtonItem;

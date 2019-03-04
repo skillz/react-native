@@ -11,25 +11,53 @@
  */
 'use strict';
 
-var ReactPropTypes = require('ReactPropTypes');
+var ReactPropTypes = require('prop-types');
 
-var ArrayOfNumberPropType = ReactPropTypes.arrayOf(ReactPropTypes.number);
+var deprecatedPropType = require('deprecatedPropType');
 
 var TransformMatrixPropType = function(
   props : Object,
   propName : string,
   componentName : string
 ) : ?Error {
-  if (props.transform && props.transformMatrix) {
+  if (props[propName]) {
     return new Error(
-      'transformMatrix and transform styles cannot be used on the same ' +
-      'component'
+      'The transformMatrix style property is deprecated. ' +
+      'Use `transform: [{ matrix: ... }]` instead.'
     );
   }
-  return ArrayOfNumberPropType(props, propName, componentName);
+};
+
+var DecomposedMatrixPropType = function(
+  props : Object,
+  propName : string,
+  componentName : string
+) : ?Error {
+  if (props[propName]) {
+    return new Error(
+      'The decomposedMatrix style property is deprecated. ' +
+      'Use `transform: [...]` instead.'
+    );
+  }
 };
 
 var TransformPropTypes = {
+  /**
+   * `transform` accepts an array of transformation objects. Each object specifies
+   * the property that will be transformed as the key, and the value to use in the
+   * transformation. Objects should not be combined. Use a single key/value pair
+   * per object.
+   *
+   * The rotate transformations require a string so that the transform may be
+   * expressed in degrees (deg) or radians (rad). For example:
+   *
+   * `transform([{ rotateX: '45deg' }, { rotateZ: '0.785398rad' }])`
+   *
+   * The skew transformations require a string so that the transform may be
+   * expressed in degrees (deg). For example:
+   *
+   * `transform([{ skewX: '45deg' }])`
+   */
   transform: ReactPropTypes.arrayOf(
     ReactPropTypes.oneOfType([
       ReactPropTypes.shape({perspective: ReactPropTypes.number}),
@@ -46,14 +74,22 @@ var TransformPropTypes = {
       ReactPropTypes.shape({skewY: ReactPropTypes.string})
     ])
   ),
+
+  /**
+   * Deprecated. Use the transform prop instead.
+   */
   transformMatrix: TransformMatrixPropType,
+  /**
+   * Deprecated. Use the transform prop instead.
+   */
+  decomposedMatrix: DecomposedMatrixPropType,
 
   /* Deprecated transform props used on Android only */
-  scaleX: ReactPropTypes.number,
-  scaleY: ReactPropTypes.number,
-  rotation: ReactPropTypes.number,
-  translateX: ReactPropTypes.number,
-  translateY: ReactPropTypes.number,
+  scaleX: deprecatedPropType(ReactPropTypes.number, 'Use the transform prop instead.'),
+  scaleY: deprecatedPropType(ReactPropTypes.number, 'Use the transform prop instead.'),
+  rotation: deprecatedPropType(ReactPropTypes.number, 'Use the transform prop instead.'),
+  translateX: deprecatedPropType(ReactPropTypes.number, 'Use the transform prop instead.'),
+  translateY: deprecatedPropType(ReactPropTypes.number, 'Use the transform prop instead.'),
 };
 
 module.exports = TransformPropTypes;

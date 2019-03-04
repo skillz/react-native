@@ -15,7 +15,7 @@ import android.app.Activity;
 
 import com.facebook.react.bridge.Callback;
 import com.facebook.react.bridge.ReactApplicationContext;
-import com.facebook.react.bridge.SimpleMap;
+import com.facebook.react.bridge.JavaOnlyMap;
 
 import org.junit.After;
 import org.junit.Before;
@@ -84,17 +84,19 @@ public class DialogModuleTest {
 
   @Test
   public void testAllOptions() {
-    final SimpleMap options = new SimpleMap();
+    final JavaOnlyMap options = new JavaOnlyMap();
     options.putString("title", "Title");
     options.putString("message", "Message");
     options.putString("buttonPositive", "OK");
     options.putString("buttonNegative", "Cancel");
     options.putString("buttonNeutral", "Later");
+    options.putBoolean("cancelable", false);
 
     mDialogModule.showAlert(options, null, null);
 
     final AlertFragment fragment = getFragment();
     assertNotNull("Fragment was not displayed", fragment);
+    assertEquals(false, fragment.isCancelable());
 
     final AlertDialog dialog = (AlertDialog) fragment.getDialog();
     assertEquals("OK", dialog.getButton(DialogInterface.BUTTON_POSITIVE).getText().toString());
@@ -104,7 +106,7 @@ public class DialogModuleTest {
 
   @Test
   public void testCallbackPositive() {
-    final SimpleMap options = new SimpleMap();
+    final JavaOnlyMap options = new JavaOnlyMap();
     options.putString("buttonPositive", "OK");
 
     final SimpleCallback actionCallback = new SimpleCallback();
@@ -120,7 +122,7 @@ public class DialogModuleTest {
 
   @Test
   public void testCallbackNegative() {
-    final SimpleMap options = new SimpleMap();
+    final JavaOnlyMap options = new JavaOnlyMap();
     options.putString("buttonNegative", "Cancel");
 
     final SimpleCallback actionCallback = new SimpleCallback();
@@ -136,7 +138,7 @@ public class DialogModuleTest {
 
   @Test
   public void testCallbackNeutral() {
-    final SimpleMap options = new SimpleMap();
+    final JavaOnlyMap options = new JavaOnlyMap();
     options.putString("buttonNeutral", "Later");
 
     final SimpleCallback actionCallback = new SimpleCallback();
@@ -152,7 +154,7 @@ public class DialogModuleTest {
 
   @Test
   public void testCallbackDismiss() {
-    final SimpleMap options = new SimpleMap();
+    final JavaOnlyMap options = new JavaOnlyMap();
 
     final SimpleCallback actionCallback = new SimpleCallback();
     mDialogModule.showAlert(options, null, actionCallback);

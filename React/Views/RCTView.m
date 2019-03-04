@@ -15,6 +15,7 @@
 #import "RCTLog.h"
 #import "RCTUtils.h"
 #import "UIView+React.h"
+#import "RCTI18nUtil.h"
 
 @implementation UIView (RCTViewUnmounting)
 
@@ -55,6 +56,7 @@
   UIView *testView = self;
   UIView *clipView = nil;
   CGRect clipRect = self.bounds;
+  // We will only look for a clipping view up the view hierarchy until we hit the root view.
   while (testView) {
     if (testView.clipsToBounds) {
       if (clipView) {
@@ -68,6 +70,9 @@
         clipRect = [self convertRect:self.bounds toView:clipView];
       }
     }
+    if ([testView isReactRootView]) {
+      break;
+    }
     testView = testView.superview;
   }
   return clipView ?: self.window;
@@ -80,11 +85,14 @@ static NSString *RCTRecursiveAccessibilityLabel(UIView *view)
   NSMutableString *str = [NSMutableString stringWithString:@""];
   for (UIView *subview in view.subviews) {
     NSString *label = subview.accessibilityLabel;
-    if (label) {
-      [str appendString:@" "];
+    if (!label) {
+      label = RCTRecursiveAccessibilityLabel(subview);
+    }
+    if (label && label.length > 0) {
+      if (str.length > 0) {
+        [str appendString:@" "];
+      }
       [str appendString:label];
-    } else {
-      [str appendString:RCTRecursiveAccessibilityLabel(subview)];
     }
   }
   return str;
@@ -92,7 +100,6 @@ static NSString *RCTRecursiveAccessibilityLabel(UIView *view)
 
 @implementation RCTView
 {
-  NSMutableArray<UIView *> *_reactSubviews;
   UIColor *_backgroundColor;
 }
 
@@ -104,11 +111,18 @@ static NSString *RCTRecursiveAccessibilityLabel(UIView *view)
     _borderRightWidth = -1;
     _borderBottomWidth = -1;
     _borderLeftWidth = -1;
+    _borderStartWidth = -1;
+    _borderEndWidth = -1;
     _borderTopLeftRadius = -1;
     _borderTopRightRadius = -1;
+    _borderTopStartRadius = -1;
+    _borderTopEndRadius = -1;
     _borderBottomLeftRadius = -1;
     _borderBottomRightRadius = -1;
+    _borderBottomStartRadius = -1;
+    _borderBottomEndRadius = -1;
     _borderStyle = RCTBorderStyleSolid;
+    _hitTestEdgeInsets = UIEdgeInsetsZero;
 
     _backgroundColor = super.backgroundColor;
   }
@@ -117,6 +131,21 @@ static NSString *RCTRecursiveAccessibilityLabel(UIView *view)
 }
 
 RCT_NOT_IMPLEMENTED(- (instancetype)initWithCoder:unused)
+
+- (void)setReactLayoutDirection:(UIUserInterfaceLayoutDirection)layoutDirection
+{
+  if (_reactLayoutDirection != layoutDirection) {
+    _reactLayoutDirection = layoutDirection;
+    [self.layer setNeedsDisplay];
+  }
+
+  if ([self respondsToSelector:@selector(setSemanticContentAttribute:)]) {
+    self.semanticContentAttribute =
+      layoutDirection == UIUserInterfaceLayoutDirectionLeftToRight ?
+        UISemanticContentAttributeForceLeftToRight :
+        UISemanticContentAttributeForceRightToLeft;
+  }
+}
 
 - (NSString *)accessibilityLabel
 {
@@ -148,13 +177,16 @@ RCT_NOT_IMPLEMENTED(- (instancetype)initWithCoder:unused)
   BOOL isPointInside = [self pointInside:point withEvent:event];
   BOOL needsHitSubview = !(_pointerEvents == RCTPointerEventsNone || _pointerEvents == RCTPointerEventsBoxOnly);
   if (needsHitSubview && (![self clipsToBounds] || isPointInside)) {
+    // Take z-index into account when calculating the touch target.
+    NSArray<UIView *> *sortedSubviews = [self reactZIndexSortedSubviews];
+
     // The default behaviour of UIKit is that if a view does not contain a point,
     // then no subviews will be returned from hit testing, even if they contain
     // the hit point. By doing hit testing directly on the subviews, we bypass
     // the strict containment policy (i.e., UIKit guarantees that every ancestor
     // of the hit view will return YES from -pointInside:withEvent:). See:
     //  - https://developer.apple.com/library/ios/qa/qa2013/qa1812.html
-    for (UIView *subview in [self.subviews reverseObjectEnumerator]) {
+    for (UIView *subview in [sortedSubviews reverseObjectEnumerator]) {
       CGPoint convertedPoint = [subview convertPoint:point fromView:self];
       hitSubview = [subview hitTest:convertedPoint withEvent:event];
       if (hitSubview != nil) {
@@ -175,9 +207,32 @@ RCT_NOT_IMPLEMENTED(- (instancetype)initWithCoder:unused)
     case RCTPointerEventsBoxNone:
       return hitSubview;
     default:
-      RCTLogError(@"Invalid pointer-events specified %zd on %@", _pointerEvents, self);
+      RCTLogError(@"Invalid pointer-events specified %lld on %@", (long long)_pointerEvents, self);
       return hitSubview ?: hitView;
   }
+}
+
+- (BOOL)pointInside:(CGPoint)point withEvent:(UIEvent *)event
+{
+  if (UIEdgeInsetsEqualToEdgeInsets(self.hitTestEdgeInsets, UIEdgeInsetsZero)) {
+    return [super pointInside:point withEvent:event];
+  }
+  CGRect hitFrame = UIEdgeInsetsInsetRect(self.bounds, self.hitTestEdgeInsets);
+  return CGRectContainsPoint(hitFrame, point);
+}
+
+- (UIView *)reactAccessibilityElement
+{
+  return self;
+}
+
+- (BOOL)isAccessibilityElement
+{
+  if (self.reactAccessibilityElement == self) {
+    return [super isAccessibilityElement];
+  }
+
+  return NO;
 }
 
 - (BOOL)accessibilityActivate
@@ -260,80 +315,16 @@ RCT_NOT_IMPLEMENTED(- (instancetype)initWithCoder:unused)
 
 - (void)react_remountAllSubviews
 {
-  if (_reactSubviews) {
-    NSUInteger index = 0;
-    for (UIView *view in _reactSubviews) {
+  if (_removeClippedSubviews) {
+    for (UIView *view in self.reactSubviews) {
       if (view.superview != self) {
-        if (index < self.subviews.count) {
-          [self insertSubview:view atIndex:index];
-        } else {
-          [self addSubview:view];
-        }
+        [self addSubview:view];
         [view react_remountAllSubviews];
       }
-      index++;
     }
   } else {
-    // If react_subviews is nil, we must already be showing all subviews
+    // If _removeClippedSubviews is false, we must already be showing all subviews
     [super react_remountAllSubviews];
-  }
-}
-
-- (void)remountSubview:(UIView *)view
-{
-  // Calculate insertion index for view
-  NSInteger index = 0;
-  for (UIView *subview in _reactSubviews) {
-    if (subview == view) {
-      [self insertSubview:view atIndex:index];
-      break;
-    }
-    if (subview.superview) {
-      // View is mounted, so bump the index
-      index++;
-    }
-  }
-}
-
-- (void)mountOrUnmountSubview:(UIView *)view withClipRect:(CGRect)clipRect relativeToView:(UIView *)clipView
-{
-  if (view.clipsToBounds) {
-
-    // View has cliping enabled, so we can easily test if it is partially
-    // or completely within the clipRect, and mount or unmount it accordingly
-
-    if (!CGSizeEqualToSize(CGRectIntersection(clipRect, view.frame).size, CGSizeZero)) {
-
-      // View is at least partially visible, so remount it if unmounted
-      if (view.superview == nil) {
-        [self remountSubview:view];
-      }
-
-      // Then test its subviews
-      if (CGRectContainsRect(clipRect, view.frame)) {
-        [view react_remountAllSubviews];
-      } else {
-        [view react_updateClippedSubviewsWithClipRect:clipRect relativeToView:clipView];
-      }
-
-    } else if (view.superview) {
-
-      // View is completely outside the clipRect, so unmount it
-      [view removeFromSuperview];
-    }
-
-  } else {
-
-    // View has clipping disabled, so there's no way to tell if it has
-    // any visible subviews without an expensive recursive test, so we'll
-    // just add it.
-
-    if (view.superview == nil) {
-      [self remountSubview:view];
-    }
-
-    // Check if subviews need to be mounted/unmounted
-    [view react_updateClippedSubviewsWithClipRect:clipRect relativeToView:clipView];
   }
 }
 
@@ -343,12 +334,12 @@ RCT_NOT_IMPLEMENTED(- (instancetype)initWithCoder:unused)
   // optimize this by only doing a range check along the scroll axis,
   // instead of comparing the whole frame
 
-  if (_reactSubviews == nil) {
+  if (!_removeClippedSubviews) {
     // Use default behavior if unmounting is disabled
     return [super react_updateClippedSubviewsWithClipRect:clipRect relativeToView:clipView];
   }
 
-  if (_reactSubviews.count == 0) {
+  if (self.reactSubviews.count == 0) {
     // Do nothing if we have no subviews
     return;
   }
@@ -360,67 +351,47 @@ RCT_NOT_IMPLEMENTED(- (instancetype)initWithCoder:unused)
 
   // Convert clipping rect to local coordinates
   clipRect = [clipView convertRect:clipRect toView:self];
+  clipRect = CGRectIntersection(clipRect, self.bounds);
   clipView = self;
-  if (self.clipsToBounds) {
-    clipRect = CGRectIntersection(clipRect, self.bounds);
-  }
 
   // Mount / unmount views
-  for (UIView *view in _reactSubviews) {
-    [self mountOrUnmountSubview:view withClipRect:clipRect relativeToView:clipView];
+  for (UIView *view in self.reactSubviews) {
+    if (!CGSizeEqualToSize(CGRectIntersection(clipRect, view.frame).size, CGSizeZero)) {
+      // View is at least partially visible, so remount it if unmounted
+      [self addSubview:view];
+
+      // Then test its subviews
+      if (CGRectContainsRect(clipRect, view.frame)) {
+        // View is fully visible, so remount all subviews
+        [view react_remountAllSubviews];
+      } else {
+        // View is partially visible, so update clipped subviews
+        [view react_updateClippedSubviewsWithClipRect:clipRect relativeToView:clipView];
+      }
+
+    } else if (view.superview) {
+
+      // View is completely outside the clipRect, so unmount it
+      [view removeFromSuperview];
+    }
   }
 }
 
 - (void)setRemoveClippedSubviews:(BOOL)removeClippedSubviews
 {
-  if (removeClippedSubviews && !_reactSubviews) {
-    _reactSubviews = [self.subviews mutableCopy];
-  } else if (!removeClippedSubviews && _reactSubviews) {
+  if (!removeClippedSubviews && _removeClippedSubviews) {
     [self react_remountAllSubviews];
-    _reactSubviews = nil;
   }
+  _removeClippedSubviews = removeClippedSubviews;
 }
 
-- (BOOL)removeClippedSubviews
+- (void)didUpdateReactSubviews
 {
-  return _reactSubviews != nil;
-}
-
-- (void)insertReactSubview:(UIView *)view atIndex:(NSInteger)atIndex
-{
-  if (_reactSubviews == nil) {
-    [self insertSubview:view atIndex:atIndex];
+  if (_removeClippedSubviews) {
+    [self updateClippedSubviews];
   } else {
-    [_reactSubviews insertObject:view atIndex:atIndex];
-
-    // Find a suitable view to use for clipping
-    UIView *clipView = [self react_findClipView];
-    if (clipView) {
-
-      // If possible, don't add subviews if they are clipped
-      [self mountOrUnmountSubview:view withClipRect:clipView.bounds relativeToView:clipView];
-
-    } else {
-
-      // Fallback if we can't find a suitable clipView
-      [self remountSubview:view];
-    }
+    [super didUpdateReactSubviews];
   }
-}
-
-- (void)removeReactSubview:(UIView *)subview
-{
-  [_reactSubviews removeObject:subview];
-  [subview removeFromSuperview];
-}
-
-- (NSArray<UIView *> *)reactSubviews
-{
-  // The _reactSubviews array is only used when we have hidden
-  // offscreen views. If _reactSubviews is nil, we can assume
-  // that [self reactSubviews] and [self subviews] are the same
-
-  return _reactSubviews ?: self.subviews;
 }
 
 - (void)updateClippedSubviews
@@ -441,7 +412,7 @@ RCT_NOT_IMPLEMENTED(- (instancetype)initWithCoder:unused)
 
   [super layoutSubviews];
 
-  if (_reactSubviews) {
+  if (_removeClippedSubviews) {
     [self updateClippedSubviews];
   }
 }
@@ -463,26 +434,77 @@ RCT_NOT_IMPLEMENTED(- (instancetype)initWithCoder:unused)
   [self.layer setNeedsDisplay];
 }
 
+static CGFloat RCTDefaultIfNegativeTo(CGFloat defaultValue, CGFloat x) {
+  return x >= 0 ? x : defaultValue;
+};
+
 - (UIEdgeInsets)bordersAsInsets
 {
   const CGFloat borderWidth = MAX(0, _borderWidth);
+  const BOOL isRTL = _reactLayoutDirection == UIUserInterfaceLayoutDirectionRightToLeft;
+
+  if ([[RCTI18nUtil sharedInstance] doLeftAndRightSwapInRTL]) {
+    const CGFloat borderStartWidth = RCTDefaultIfNegativeTo(_borderLeftWidth, _borderStartWidth);
+    const CGFloat borderEndWidth = RCTDefaultIfNegativeTo(_borderRightWidth, _borderEndWidth);
+
+    const CGFloat directionAwareBorderLeftWidth = isRTL ? borderEndWidth : borderStartWidth;
+    const CGFloat directionAwareBorderRightWidth = isRTL ? borderStartWidth : borderEndWidth;
+
+    return (UIEdgeInsets) {
+      RCTDefaultIfNegativeTo(borderWidth, _borderTopWidth),
+      RCTDefaultIfNegativeTo(borderWidth, directionAwareBorderLeftWidth),
+      RCTDefaultIfNegativeTo(borderWidth, _borderBottomWidth),
+      RCTDefaultIfNegativeTo(borderWidth, directionAwareBorderRightWidth),
+    };
+  }
+
+  const CGFloat directionAwareBorderLeftWidth = isRTL ? _borderEndWidth : _borderStartWidth;
+  const CGFloat directionAwareBorderRightWidth = isRTL ? _borderStartWidth : _borderEndWidth;
 
   return (UIEdgeInsets) {
-    _borderTopWidth >= 0 ? _borderTopWidth : borderWidth,
-    _borderLeftWidth >= 0 ? _borderLeftWidth : borderWidth,
-    _borderBottomWidth >= 0 ? _borderBottomWidth : borderWidth,
-    _borderRightWidth  >= 0 ? _borderRightWidth : borderWidth,
+    RCTDefaultIfNegativeTo(borderWidth, _borderTopWidth),
+    RCTDefaultIfNegativeTo(borderWidth, RCTDefaultIfNegativeTo(_borderLeftWidth, directionAwareBorderLeftWidth)),
+    RCTDefaultIfNegativeTo(borderWidth, _borderBottomWidth),
+    RCTDefaultIfNegativeTo(borderWidth, RCTDefaultIfNegativeTo(_borderRightWidth, directionAwareBorderRightWidth)),
   };
 }
 
 - (RCTCornerRadii)cornerRadii
 {
-  // Get corner radii
+  const BOOL isRTL = _reactLayoutDirection == UIUserInterfaceLayoutDirectionRightToLeft;
   const CGFloat radius = MAX(0, _borderRadius);
-  const CGFloat topLeftRadius = _borderTopLeftRadius >= 0 ? _borderTopLeftRadius : radius;
-  const CGFloat topRightRadius = _borderTopRightRadius >= 0 ? _borderTopRightRadius : radius;
-  const CGFloat bottomLeftRadius = _borderBottomLeftRadius >= 0 ? _borderBottomLeftRadius : radius;
-  const CGFloat bottomRightRadius = _borderBottomRightRadius >= 0 ? _borderBottomRightRadius : radius;
+
+  CGFloat topLeftRadius;
+  CGFloat topRightRadius;
+  CGFloat bottomLeftRadius;
+  CGFloat bottomRightRadius;
+
+  if ([[RCTI18nUtil sharedInstance] doLeftAndRightSwapInRTL]) {
+    const CGFloat topStartRadius = RCTDefaultIfNegativeTo(_borderTopLeftRadius, _borderTopStartRadius);
+    const CGFloat topEndRadius = RCTDefaultIfNegativeTo(_borderTopRightRadius, _borderTopEndRadius);
+    const CGFloat bottomStartRadius = RCTDefaultIfNegativeTo(_borderBottomLeftRadius, _borderBottomStartRadius);
+    const CGFloat bottomEndRadius = RCTDefaultIfNegativeTo(_borderBottomRightRadius, _borderBottomEndRadius);
+
+    const CGFloat directionAwareTopLeftRadius = isRTL ? topEndRadius : topStartRadius;
+    const CGFloat directionAwareTopRightRadius = isRTL ? topStartRadius : topEndRadius;
+    const CGFloat directionAwareBottomLeftRadius = isRTL ? bottomEndRadius : bottomStartRadius;
+    const CGFloat directionAwareBottomRightRadius = isRTL ? bottomStartRadius : bottomEndRadius;
+
+    topLeftRadius = RCTDefaultIfNegativeTo(radius, directionAwareTopLeftRadius);
+    topRightRadius = RCTDefaultIfNegativeTo(radius, directionAwareTopRightRadius);
+    bottomLeftRadius = RCTDefaultIfNegativeTo(radius, directionAwareBottomLeftRadius);
+    bottomRightRadius = RCTDefaultIfNegativeTo(radius, directionAwareBottomRightRadius);
+  } else {
+    const CGFloat directionAwareTopLeftRadius = isRTL ? _borderTopEndRadius : _borderTopStartRadius;
+    const CGFloat directionAwareTopRightRadius = isRTL ? _borderTopStartRadius : _borderTopEndRadius;
+    const CGFloat directionAwareBottomLeftRadius = isRTL ? _borderBottomEndRadius : _borderBottomStartRadius;
+    const CGFloat directionAwareBottomRightRadius = isRTL ? _borderBottomStartRadius : _borderBottomEndRadius;
+
+    topLeftRadius = RCTDefaultIfNegativeTo(radius, RCTDefaultIfNegativeTo(_borderTopLeftRadius, directionAwareTopLeftRadius));
+    topRightRadius = RCTDefaultIfNegativeTo(radius, RCTDefaultIfNegativeTo(_borderTopRightRadius, directionAwareTopRightRadius));
+    bottomLeftRadius = RCTDefaultIfNegativeTo(radius, RCTDefaultIfNegativeTo(_borderBottomLeftRadius, directionAwareBottomLeftRadius));
+    bottomRightRadius = RCTDefaultIfNegativeTo(radius, RCTDefaultIfNegativeTo(_borderBottomRightRadius, directionAwareBottomRightRadius));
+  }
 
   // Get scale factors required to prevent radii from overlapping
   const CGSize size = self.bounds.size;
@@ -502,11 +524,31 @@ RCT_NOT_IMPLEMENTED(- (instancetype)initWithCoder:unused)
 
 - (RCTBorderColors)borderColors
 {
+  const BOOL isRTL = _reactLayoutDirection == UIUserInterfaceLayoutDirectionRightToLeft;
+
+  if ([[RCTI18nUtil sharedInstance] doLeftAndRightSwapInRTL]) {
+    const CGColorRef borderStartColor = _borderStartColor ?: _borderLeftColor;
+    const CGColorRef borderEndColor = _borderEndColor ?: _borderRightColor;
+
+    const CGColorRef directionAwareBorderLeftColor = isRTL ? borderEndColor : borderStartColor;
+    const CGColorRef directionAwareBorderRightColor = isRTL ? borderStartColor : borderEndColor;
+
+    return (RCTBorderColors){
+      _borderTopColor ?: _borderColor,
+      directionAwareBorderLeftColor ?: _borderColor,
+      _borderBottomColor ?: _borderColor,
+      directionAwareBorderRightColor ?: _borderColor,
+    };
+  }
+
+  const CGColorRef directionAwareBorderLeftColor = isRTL ? _borderEndColor : _borderStartColor;
+  const CGColorRef directionAwareBorderRightColor = isRTL ? _borderStartColor : _borderEndColor;
+
   return (RCTBorderColors){
     _borderTopColor ?: _borderColor,
-    _borderLeftColor ?: _borderColor,
+    directionAwareBorderLeftColor ?: _borderLeftColor ?: _borderColor,
     _borderBottomColor ?: _borderColor,
-    _borderRightColor ?: _borderColor,
+    directionAwareBorderRightColor ?: _borderRightColor ?: _borderColor,
   };
 }
 
@@ -545,7 +587,7 @@ RCT_NOT_IMPLEMENTED(- (instancetype)initWithCoder:unused)
   // the content. For this reason, only use iOS border drawing when clipping
   // or when the border is hidden.
 
-  (borderInsets.top == 0 || CGColorGetAlpha(borderColors.top) == 0 || self.clipsToBounds);
+  (borderInsets.top == 0 || (borderColors.top && CGColorGetAlpha(borderColors.top) == 0) || self.clipsToBounds);
 
   // iOS clips to the outside of the border, but CSS clips to the inside. To
   // solve this, we'll need to add a container view inside the main view to
@@ -643,10 +685,10 @@ static void RCTUpdateShadowPathForView(RCTView *view)
       // Can't accurately calculate box shadow, so fall back to pixel-based shadow
       view.layer.shadowPath = nil;
 
-      RCTLogWarn(@"View #%@ of type %@ has a shadow set but cannot calculate "
-                 "shadow efficiently. Consider setting a background color to "
-                 "fix this, or apply the shadow to a more specific component.",
-                 view.reactTag, [view class]);
+      RCTLogAdvice(@"View #%@ of type %@ has a shadow set but cannot calculate "
+        "shadow efficiently. Consider setting a background color to "
+        "fix this, or apply the shadow to a more specific component.",
+        view.reactTag, [view class]);
     }
   }
 }
@@ -695,6 +737,8 @@ setBorderColor(Top)
 setBorderColor(Right)
 setBorderColor(Bottom)
 setBorderColor(Left)
+setBorderColor(Start)
+setBorderColor(End)
 
 #pragma mark - Border Width
 
@@ -713,6 +757,8 @@ setBorderWidth(Top)
 setBorderWidth(Right)
 setBorderWidth(Bottom)
 setBorderWidth(Left)
+setBorderWidth(Start)
+setBorderWidth(End)
 
 #pragma mark - Border Radius
 
@@ -729,8 +775,12 @@ setBorderWidth(Left)
 setBorderRadius()
 setBorderRadius(TopLeft)
 setBorderRadius(TopRight)
+setBorderRadius(TopStart)
+setBorderRadius(TopEnd)
 setBorderRadius(BottomLeft)
 setBorderRadius(BottomRight)
+setBorderRadius(BottomStart)
+setBorderRadius(BottomEnd)
 
 #pragma mark - Border Style
 
@@ -753,6 +803,8 @@ setBorderStyle()
   CGColorRelease(_borderRightColor);
   CGColorRelease(_borderBottomColor);
   CGColorRelease(_borderLeftColor);
+  CGColorRelease(_borderStartColor);
+  CGColorRelease(_borderEndColor);
 }
 
 @end

@@ -10,8 +10,7 @@
 /*jslint node: true */
 'use strict';
 
-var esprima = require('esprima-fb');
-var Syntax = esprima.Syntax;
+var Syntax = require('./syntax');
 var traverseFlat = require('./traverseFlat');
 
 
@@ -72,7 +71,7 @@ function isAssignmentStatement(node) {
  */
 function expressionToArray(expr) {
   var parts = [];
-  switch(expr.type) {
+  switch (expr.type) {
     case Syntax.CallExpression:
       parts = expressionToArray(expr.callee);
       break;

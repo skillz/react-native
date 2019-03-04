@@ -9,10 +9,19 @@
 
 package com.facebook.react.devsupport;
 
+import com.facebook.react.devsupport.interfaces.ErrorCustomizer;
+import javax.annotation.Nullable;
+
+import java.io.File;
+
 import com.facebook.react.bridge.DefaultNativeModuleCallExceptionHandler;
 import com.facebook.react.bridge.ReactContext;
 import com.facebook.react.bridge.ReadableArray;
-import com.facebook.react.modules.debug.DeveloperSettings;
+import com.facebook.react.devsupport.interfaces.DevOptionHandler;
+import com.facebook.react.devsupport.interfaces.DevSupportManager;
+import com.facebook.react.devsupport.interfaces.PackagerStatusCallback;
+import com.facebook.react.devsupport.interfaces.StackFrame;
+import com.facebook.react.modules.debug.interfaces.DeveloperSettings;
 
 /**
  * A dummy implementation of {@link DevSupportManager} to be used in production mode where
@@ -47,12 +56,27 @@ public class DisabledDevSupportManager implements DevSupportManager {
   }
 
   @Override
+  public void hideRedboxDialog() {
+
+  }
+
+  @Override
   public void showDevOptionsDialog() {
 
   }
 
   @Override
   public void setDevSupportEnabled(boolean isDevSupportEnabled) {
+
+  }
+
+  @Override
+  public void startInspector() {
+
+  }
+
+  @Override
+  public void stopInspector() {
 
   }
 
@@ -112,8 +136,35 @@ public class DisabledDevSupportManager implements DevSupportManager {
   }
 
   @Override
-  public void isPackagerRunning(DevServerHelper.PackagerStatusCallback callback) {
+  public void reloadJSFromServer(String bundleURL) {
 
+  }
+
+  @Override
+  public void isPackagerRunning(PackagerStatusCallback callback) {
+
+  }
+
+  @Override
+  public @Nullable File downloadBundleResourceFromUrlSync(
+      final String resourceURL,
+      final File outputFile) {
+    return null;
+  }
+
+  @Override
+  public @Nullable String getLastErrorTitle() {
+    return null;
+  }
+
+  @Override
+  public @Nullable StackFrame[] getLastErrorStack() {
+    return null;
+  }
+
+  @Override
+  public void registerErrorCustomizer(ErrorCustomizer errorCustomizer) {
+    
   }
 
   @Override

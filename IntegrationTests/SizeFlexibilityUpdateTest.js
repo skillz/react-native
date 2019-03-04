@@ -5,22 +5,26 @@
  * This source code is licensed under the BSD-style license found in the
  * LICENSE file in the root directory of this source tree. An additional grant
  * of patent rights can be found in the PATENTS file in the same directory.
+ * @providesModule SizeFlexibilityUpdateTest
  */
 'use strict';
 
-var React = require('react-native');
+var React = require('react');
+var createReactClass = require('create-react-class');
+var ReactNative = require('react-native');
 var RCTNativeAppEventEmitter = require('RCTNativeAppEventEmitter');
 var Subscribable = require('Subscribable');
-var { View } = React;
+var { View } = ReactNative;
 
-var { TestModule } = React.addons;
+var { TestModule } = ReactNative.NativeModules;
 
 var reactViewWidth = 111;
 var reactViewHeight = 222;
 
 var finalState = false;
 
-var SizeFlexibilityUpdateTest = React.createClass({
+var SizeFlexibilityUpdateTest = createReactClass({
+  displayName: 'SizeFlexibilityUpdateTest',
   mixins: [Subscribable.Mixin],
 
   componentWillMount: function() {

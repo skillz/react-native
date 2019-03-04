@@ -1,38 +1,45 @@
 /**
+ * Copyright (c) 2016-present, Facebook, Inc.
+ * All rights reserved.
  *
- * Copyright 2013-2014 Facebook, Inc.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This source code is licensed under the BSD-style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
  *
  * @providesModule Promise
- *
- * This module wraps and augments the minimally ES6-compliant Promise
- * implementation provided by the promise npm package.
+ * @flow
  */
-
 'use strict';
 
-global.setImmediate = require('setImmediate');
-var Promise = require('promise/setimmediate/es6-extensions');
-require('promise/setimmediate/done');
+/* $FlowFixMe(>=0.54.0 site=react_native_oss) This comment suppresses an error
+ * found when Flow v0.54 was deployed. To see the error delete this comment and
+ * run Flow. */
+const Promise = require('fbjs/lib/Promise.native');
+
 if (__DEV__) {
+  /* $FlowFixMe(>=0.54.0 site=react_native_oss) This comment suppresses an
+   * error found when Flow v0.54 was deployed. To see the error delete this
+   * comment and run Flow. */
   require('promise/setimmediate/rejection-tracking').enable({
     allRejections: true,
-    onUnhandled: (id, error) => {
-      const {message, stack} = error;
+    onUnhandled: (id, error = {}) => {
+      let message: string;
+      let stack: ?string;
+
+      const stringValue = Object.prototype.toString.call(error);
+      if (stringValue === '[object Error]') {
+        message = Error.prototype.toString.call(error);
+        stack = error.stack;
+      } else {
+        /* $FlowFixMe(>=0.54.0 site=react_native_oss) This comment suppresses
+         * an error found when Flow v0.54 was deployed. To see the error delete
+         * this comment and run Flow. */
+        message = require('pretty-format')(error);
+      }
+
       const warning =
         `Possible Unhandled Promise Rejection (id: ${id}):\n` +
-        (message == null ? '' : `${message}\n`) +
+        `${message}\n` +
         (stack == null ? '' : stack);
       console.warn(warning);
     },
@@ -45,13 +52,5 @@ if (__DEV__) {
     },
   });
 }
-
-/**
- * Handle either fulfillment or rejection with the same callback.
- */
-Promise.prototype.finally = function(onSettled) {
-  return this.then(onSettled, onSettled);
-};
-
 
 module.exports = Promise;

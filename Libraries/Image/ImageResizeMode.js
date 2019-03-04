@@ -11,7 +11,10 @@
  */
 'use strict';
 
-var keyMirror = require('keyMirror');
+/* $FlowFixMe(>=0.54.0 site=react_native_oss) This comment suppresses an error
+ * found when Flow v0.54 was deployed. To see the error delete this comment and
+ * run Flow. */
+var keyMirror = require('fbjs/lib/keyMirror');
 
 /**
  * ImageResizeMode - Enum for different image resizing modes, set via
@@ -34,6 +37,18 @@ var ImageResizeMode = keyMirror({
    * distorting it.
    */
   stretch: null,
+  /**
+  * center - The image will be scaled down such that it is completely visible,
+  * if bigger than the area of the view.
+  * The image will not be scaled up.
+  */
+  center: null,
+
+  /**
+   * repeat - The image will be repeated to cover the frame of the View. The
+   * image will keep it's size and aspect ratio.
+   */
+  repeat: null,
 });
 
 module.exports = ImageResizeMode;
