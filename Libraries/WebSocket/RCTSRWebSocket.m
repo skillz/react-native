@@ -501,7 +501,7 @@ RCT_NOT_IMPLEMENTED(- (instancetype)init)
     CFStringRef httpHost = CFDictionaryGetValue(proxyDict, kCFStreamPropertyHTTPProxyHost);
     if (httpHost != NULL) {
       CFMutableDictionaryRef socksConfig = CFDictionaryCreateMutableCopy(NULL, 0, proxyDict);
-      CFDictionarySetValue(socksConfig, (__bridge CFStringRef)@"SOCKSEnable", (__bridge CFNumberRef)[NSNumber numberWithInteger:1]);
+      CFDictionarySetValue(socksConfig, CFSTR("SOCKSEnable"), kCFBooleanTrue);
       CFDictionarySetValue(socksConfig, kCFStreamPropertySOCKSProxyHost, httpHost);
       CFDictionarySetValue(socksConfig, kCFStreamPropertySOCKSProxyPort, (__bridge CFNumberRef)[NSNumber numberWithInteger:8889]);
       CFDictionarySetValue(socksConfig, kCFStreamPropertySOCKSVersion, kCFStreamSocketSOCKSVersion5);
