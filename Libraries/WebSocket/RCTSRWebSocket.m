@@ -495,7 +495,22 @@ RCT_NOT_IMPLEMENTED(- (instancetype)init)
   CFWriteStreamRef writeStream = NULL;
 
   CFStreamCreatePairWithSocketToHost(NULL, (__bridge CFStringRef)host, port, &readStream, &writeStream);
-
+  
+  CFDictionaryRef proxyDict = CFNetworkCopySystemProxySettings();
+  if (proxyDict) {
+    CFStringRef httpHost = CFDictionaryGetValue(proxyDict, kCFStreamPropertyHTTPProxyHost);
+    if (httpHost != NULL) {
+      CFMutableDictionaryRef socksConfig = CFDictionaryCreateMutableCopy(NULL, 0, proxyDict);
+      CFDictionarySetValue(socksConfig, CFSTR("SOCKSEnable"), kCFBooleanTrue);
+      CFDictionarySetValue(socksConfig, kCFStreamPropertySOCKSProxyHost, httpHost);
+      CFDictionarySetValue(socksConfig, kCFStreamPropertySOCKSProxyPort, (__bridge CFNumberRef)[NSNumber numberWithInteger:8889]);
+      CFDictionarySetValue(socksConfig, kCFStreamPropertySOCKSVersion, kCFStreamSocketSOCKSVersion5);
+      CFReadStreamSetProperty(readStream, kCFStreamPropertySOCKSProxy, socksConfig);
+      CFWriteStreamSetProperty(writeStream, kCFStreamPropertySOCKSProxy, socksConfig);
+    }
+    CFRelease(proxyDict);
+  }
+  
   _outputStream = CFBridgingRelease(writeStream);
   _inputStream = CFBridgingRelease(readStream);
 
