@@ -1,12 +1,9 @@
 /**
- * Copyright (c) 2015-present, Facebook, Inc.
- * All rights reserved.
+ * Copyright (c) Facebook, Inc. and its affiliates.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
  *
- * @providesModule renderApplication
  * @format
  * @flow
  */
@@ -14,10 +11,11 @@
 'use strict';
 
 const AppContainer = require('AppContainer');
+import PerformanceLogger from 'PerformanceLogger';
 const React = require('React');
-const ReactNative = require('ReactNative');
+const ReactFabricIndicator = require('ReactFabricIndicator');
 
-const invariant = require('fbjs/lib/invariant');
+const invariant = require('invariant');
 
 // require BackHandler so it sets the default handler that exits the app if no listeners respond
 require('BackHandler');
@@ -27,15 +25,42 @@ function renderApplication<Props: Object>(
   initialProps: Props,
   rootTag: any,
   WrapperComponent?: ?React.ComponentType<*>,
+  fabric?: boolean,
+  showFabricIndicator?: boolean,
 ) {
   invariant(rootTag, 'Expect to have a valid rootTag, instead got ', rootTag);
 
-  ReactNative.render(
+  let renderable = (
     <AppContainer rootTag={rootTag} WrapperComponent={WrapperComponent}>
       <RootComponent {...initialProps} rootTag={rootTag} />
-    </AppContainer>,
-    rootTag,
+      {fabric === true && showFabricIndicator === true ? (
+        <ReactFabricIndicator />
+      ) : null}
+    </AppContainer>
   );
+
+  // If the root component is async, the user probably wants the initial render
+  // to be async also. To do this, wrap AppContainer with an async marker.
+  // For more info see https://fb.me/is-component-async
+  if (
+    /* $FlowFixMe(>=0.68.0 site=react_native_fb) This comment suppresses an
+     * error found when Flow v0.68 was deployed. To see the error delete this
+     * comment and run Flow. */
+    RootComponent.prototype != null &&
+    RootComponent.prototype.unstable_isAsyncReactComponent === true
+  ) {
+    // $FlowFixMe This is not yet part of the official public API
+    const ConcurrentMode = React.unstable_ConcurrentMode;
+    renderable = <ConcurrentMode>{renderable}</ConcurrentMode>;
+  }
+
+  PerformanceLogger.startTimespan('renderApplication_React_render');
+  if (fabric) {
+    require('ReactFabric').render(renderable, rootTag);
+  } else {
+    require('ReactNative').render(renderable, rootTag);
+  }
+  PerformanceLogger.stopTimespan('renderApplication_React_render');
 }
 
 module.exports = renderApplication;

@@ -1,10 +1,8 @@
 /**
- * Copyright (c) 2015-present, Facebook, Inc.
- * All rights reserved.
+ * Copyright (c) Facebook, Inc. and its affiliates.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
  */
 
 #import "RCTLocationObserver.h"
@@ -157,6 +155,11 @@ RCT_EXPORT_MODULE()
 {
   if (!_locationConfiguration.skipPermissionRequests) {
     [self requestAuthorization];
+  }
+  
+  if (!_locationManager) {
+    _locationManager = [CLLocationManager new];
+    _locationManager.delegate = self;
   }
 
   _locationManager.distanceFilter  = distanceFilter;
@@ -350,11 +353,6 @@ RCT_EXPORT_METHOD(getCurrentPosition:(RCTLocationOptions)options
       [_locationManager stopUpdatingLocation];
   }
 
-  // Reset location accuracy if desiredAccuracy is changed.
-  // Otherwise update accuracy will force triggering didUpdateLocations, watchPosition would keeping receiving location updates, even there's no location changes.
-  if (ABS(_locationManager.desiredAccuracy - RCT_DEFAULT_LOCATION_ACCURACY) > 0.000001) {
-    _locationManager.desiredAccuracy = RCT_DEFAULT_LOCATION_ACCURACY;
-  }
 }
 
 - (void)locationManager:(CLLocationManager *)manager didFailWithError:(NSError *)error
@@ -386,11 +384,6 @@ RCT_EXPORT_METHOD(getCurrentPosition:(RCTLocationOptions)options
   }
   [_pendingRequests removeAllObjects];
 
-  // Reset location accuracy if desiredAccuracy is changed.
-  // Otherwise update accuracy will force triggering didUpdateLocations, watchPosition would keeping receiving location updates, even there's no location changes.
-  if (ABS(_locationManager.desiredAccuracy - RCT_DEFAULT_LOCATION_ACCURACY) > 0.000001) {
-    _locationManager.desiredAccuracy = RCT_DEFAULT_LOCATION_ACCURACY;
-  }
 }
 
 static void checkLocationConfig()

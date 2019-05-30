@@ -1,18 +1,15 @@
 /**
- * Copyright (c) 2015-present, Facebook, Inc.
- * All rights reserved.
+ * Copyright (c) Facebook, Inc. and its affiliates.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
  *
- * @providesModule ViewabilityHelper
  * @flow
  * @format
  */
 'use strict';
 
-const invariant = require('fbjs/lib/invariant');
+const invariant = require('invariant');
 
 export type ViewToken = {
   item: any,
@@ -60,21 +57,23 @@ export type ViewabilityConfig = {|
 |};
 
 /**
-* A Utility class for calculating viewable items based on current metrics like scroll position and
-* layout.
-*
-* An item is said to be in a "viewable" state when any of the following
-* is true for longer than `minimumViewTime` milliseconds (after an interaction if `waitForInteraction`
-* is true):
-*
-* - Occupying >= `viewAreaCoveragePercentThreshold` of the view area XOR fraction of the item
-*   visible in the view area >= `itemVisiblePercentThreshold`.
-* - Entirely visible on screen
-*/
+ * A Utility class for calculating viewable items based on current metrics like scroll position and
+ * layout.
+ *
+ * An item is said to be in a "viewable" state when any of the following
+ * is true for longer than `minimumViewTime` milliseconds (after an interaction if `waitForInteraction`
+ * is true):
+ *
+ * - Occupying >= `viewAreaCoveragePercentThreshold` of the view area XOR fraction of the item
+ *   visible in the view area >= `itemVisiblePercentThreshold`.
+ * - Entirely visible on screen
+ */
 class ViewabilityHelper {
   _config: ViewabilityConfig;
   _hasInteracted: boolean = false;
-  _lastUpdateTime: number = 0;
+  /* $FlowFixMe(>=0.63.0 site=react_native_fb) This comment suppresses an error
+   * found when Flow v0.63 was deployed. To see the error delete this comment
+   * and run Flow. */
   _timers: Set<number> = new Set();
   _viewableIndices: Array<number> = [];
   _viewableItems: Map<string, ViewToken> = new Map();
@@ -122,10 +121,13 @@ class ViewabilityHelper {
     }
     let firstVisible = -1;
     const {first, last} = renderRange || {first: 0, last: itemCount - 1};
-    invariant(
-      last < itemCount,
-      'Invalid render range ' + JSON.stringify({renderRange, itemCount}),
-    );
+    if (last >= itemCount) {
+      console.warn(
+        'Invalid render range computing viewability ' +
+          JSON.stringify({renderRange, itemCount}),
+      );
+      return [];
+    }
     for (let idx = first; idx <= last; idx++) {
       const metrics = getFrameMetrics(idx);
       if (!metrics) {
@@ -170,15 +172,11 @@ class ViewabilityHelper {
     }) => void,
     renderRange?: {first: number, last: number}, // Optional optimization to reduce the scan size
   ): void {
-    const updateTime = Date.now();
-    if (this._lastUpdateTime === 0 && itemCount > 0 && getFrameMetrics(0)) {
-      // Only count updates after the first item is rendered and has a frame.
-      this._lastUpdateTime = updateTime;
-    }
-    const updateElapsed = this._lastUpdateTime
-      ? updateTime - this._lastUpdateTime
-      : 0;
-    if (this._config.waitForInteraction && !this._hasInteracted) {
+    if (
+      (this._config.waitForInteraction && !this._hasInteracted) ||
+      itemCount === 0 ||
+      !getFrameMetrics(0)
+    ) {
       return;
     }
     let viewableIndices = [];
@@ -200,11 +198,7 @@ class ViewabilityHelper {
       return;
     }
     this._viewableIndices = viewableIndices;
-    this._lastUpdateTime = updateTime;
-    if (
-      this._config.minimumViewTime &&
-      updateElapsed < this._config.minimumViewTime
-    ) {
+    if (this._config.minimumViewTime) {
       const handle = setTimeout(() => {
         this._timers.delete(handle);
         this._onUpdateSync(

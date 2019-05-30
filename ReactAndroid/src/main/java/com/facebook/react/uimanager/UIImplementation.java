@@ -1,10 +1,8 @@
 /**
- * Copyright (c) 2015-present, Facebook, Inc.
- * All rights reserved.
+ * Copyright (c) Facebook, Inc. and its affiliates.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
  */
 package com.facebook.react.uimanager;
 
@@ -26,6 +24,8 @@ import com.facebook.react.bridge.UiThreadUtil;
 import com.facebook.react.bridge.WritableArray;
 import com.facebook.react.common.ReactConstants;
 import com.facebook.react.modules.i18nmanager.I18nUtil;
+import com.facebook.react.uimanager.common.MeasureSpecProvider;
+import com.facebook.react.uimanager.common.SizeMonitoringFrameLayout;
 import com.facebook.react.uimanager.debug.NotThreadSafeViewHierarchyUpdateDebugListener;
 import com.facebook.react.uimanager.events.EventDispatcher;
 import com.facebook.systrace.Systrace;
@@ -43,6 +43,7 @@ import javax.annotation.Nullable;
  * shadow node hierarchy that is then mapped to a native view hierarchy.
  */
 public class UIImplementation {
+  protected Object uiImplementationThreadLock = new Object();
 
   protected final EventDispatcher mEventDispatcher;
   protected final ReactApplicationContext mReactContext;
@@ -87,7 +88,7 @@ public class UIImplementation {
         minTimeLeftInFrameForNonBatchedOperationMs);
   }
 
-  private UIImplementation(
+  UIImplementation(
       ReactApplicationContext reactContext,
       ViewManagerRegistry viewManagers,
       EventDispatcher eventDispatcher,
@@ -197,18 +198,25 @@ public class UIImplementation {
    */
   public <T extends SizeMonitoringFrameLayout & MeasureSpecProvider> void registerRootView(
       T rootView, int tag, ThemedReactContext context) {
-    final ReactShadowNode rootCSSNode = createRootShadowNode();
-    rootCSSNode.setReactTag(tag);
-    rootCSSNode.setThemedContext(context);
+    synchronized (uiImplementationThreadLock) {
+      final ReactShadowNode rootCSSNode = createRootShadowNode();
+      rootCSSNode.setReactTag(tag);
+      rootCSSNode.setThemedContext(context);
 
-    int widthMeasureSpec = rootView.getWidthMeasureSpec();
-    int heightMeasureSpec = rootView.getHeightMeasureSpec();
-    updateRootView(rootCSSNode, widthMeasureSpec, heightMeasureSpec);
+      int widthMeasureSpec = rootView.getWidthMeasureSpec();
+      int heightMeasureSpec = rootView.getHeightMeasureSpec();
+      updateRootView(rootCSSNode, widthMeasureSpec, heightMeasureSpec);
 
-    mShadowNodeRegistry.addRootNode(rootCSSNode);
+      context.runOnNativeModulesQueueThread(new Runnable() {
+        @Override
+        public void run() {
+          mShadowNodeRegistry.addRootNode(rootCSSNode);
+        }
+      });
 
-    // register it within NativeViewHierarchyManager
-    mOperationsQueue.addRootView(tag, rootView, context);
+      // register it within NativeViewHierarchyManager
+      mOperationsQueue.addRootView(tag, rootView, context);
+    }
   }
 
   /**
@@ -223,7 +231,9 @@ public class UIImplementation {
    * Unregisters a root node with a given tag from the shadow node registry
    */
   public void removeRootShadowNode(int rootViewTag) {
-    mShadowNodeRegistry.removeRootNode(rootViewTag);
+    synchronized (uiImplementationThreadLock) {
+      mShadowNodeRegistry.removeRootNode(rootViewTag);
+    }
   }
 
   /**
@@ -274,22 +284,25 @@ public class UIImplementation {
    * Invoked by React to create a new node with a given tag, class name and properties.
    */
   public void createView(int tag, String className, int rootViewTag, ReadableMap props) {
-    ReactShadowNode cssNode = createShadowNode(className);
-    ReactShadowNode rootNode = mShadowNodeRegistry.getNode(rootViewTag);
-    cssNode.setReactTag(tag);
-    cssNode.setViewClassName(className);
-    cssNode.setRootNode(rootNode);
-    cssNode.setThemedContext(rootNode.getThemedContext());
+    synchronized (uiImplementationThreadLock) {
+      ReactShadowNode cssNode = createShadowNode(className);
+      ReactShadowNode rootNode = mShadowNodeRegistry.getNode(rootViewTag);
+      Assertions.assertNotNull(rootNode, "Root node with tag " + rootViewTag + " doesn't exist");
+      cssNode.setReactTag(tag);
+      cssNode.setViewClassName(className);
+      cssNode.setRootTag(rootNode.getReactTag());
+      cssNode.setThemedContext(rootNode.getThemedContext());
 
-    mShadowNodeRegistry.addNode(cssNode);
+      mShadowNodeRegistry.addNode(cssNode);
 
-    ReactStylesDiffMap styles = null;
-    if (props != null) {
-      styles = new ReactStylesDiffMap(props);
-      cssNode.updateProperties(styles);
+      ReactStylesDiffMap styles = null;
+      if (props != null) {
+        styles = new ReactStylesDiffMap(props);
+        cssNode.updateProperties(styles);
+      }
+
+      handleCreateView(cssNode, rootViewTag, styles);
     }
-
-    handleCreateView(cssNode, rootViewTag, styles);
   }
 
   protected void handleCreateView(
@@ -357,106 +370,108 @@ public class UIImplementation {
       @Nullable ReadableArray addChildTags,
       @Nullable ReadableArray addAtIndices,
       @Nullable ReadableArray removeFrom) {
-    ReactShadowNode cssNodeToManage = mShadowNodeRegistry.getNode(viewTag);
+    synchronized (uiImplementationThreadLock) {
+      ReactShadowNode cssNodeToManage = mShadowNodeRegistry.getNode(viewTag);
 
-    int numToMove = moveFrom == null ? 0 : moveFrom.size();
-    int numToAdd = addChildTags == null ? 0 : addChildTags.size();
-    int numToRemove = removeFrom == null ? 0 : removeFrom.size();
+      int numToMove = moveFrom == null ? 0 : moveFrom.size();
+      int numToAdd = addChildTags == null ? 0 : addChildTags.size();
+      int numToRemove = removeFrom == null ? 0 : removeFrom.size();
 
-    if (numToMove != 0 && (moveTo == null || numToMove != moveTo.size())) {
-      throw new IllegalViewOperationException("Size of moveFrom != size of moveTo!");
-    }
-
-    if (numToAdd != 0 && (addAtIndices == null || numToAdd != addAtIndices.size())) {
-      throw new IllegalViewOperationException("Size of addChildTags != size of addAtIndices!");
-    }
-
-    // We treat moves as an add and a delete
-    ViewAtIndex[] viewsToAdd = new ViewAtIndex[numToMove + numToAdd];
-    int[] indicesToRemove = new int[numToMove + numToRemove];
-    int[] tagsToRemove = new int[indicesToRemove.length];
-    int[] tagsToDelete = new int[numToRemove];
-
-    if (numToMove > 0) {
-      Assertions.assertNotNull(moveFrom);
-      Assertions.assertNotNull(moveTo);
-      for (int i = 0; i < numToMove; i++) {
-        int moveFromIndex = moveFrom.getInt(i);
-        int tagToMove = cssNodeToManage.getChildAt(moveFromIndex).getReactTag();
-        viewsToAdd[i] = new ViewAtIndex(
-            tagToMove,
-            moveTo.getInt(i));
-        indicesToRemove[i] = moveFromIndex;
-        tagsToRemove[i] = tagToMove;
+      if (numToMove != 0 && (moveTo == null || numToMove != moveTo.size())) {
+        throw new IllegalViewOperationException("Size of moveFrom != size of moveTo!");
       }
-    }
 
-    if (numToAdd > 0) {
-      Assertions.assertNotNull(addChildTags);
-      Assertions.assertNotNull(addAtIndices);
-      for (int i = 0; i < numToAdd; i++) {
-        int viewTagToAdd = addChildTags.getInt(i);
-        int indexToAddAt = addAtIndices.getInt(i);
-        viewsToAdd[numToMove + i] = new ViewAtIndex(viewTagToAdd, indexToAddAt);
+      if (numToAdd != 0 && (addAtIndices == null || numToAdd != addAtIndices.size())) {
+        throw new IllegalViewOperationException("Size of addChildTags != size of addAtIndices!");
       }
-    }
 
-    if (numToRemove > 0) {
-      Assertions.assertNotNull(removeFrom);
-      for (int i = 0; i < numToRemove; i++) {
-        int indexToRemove = removeFrom.getInt(i);
-        int tagToRemove = cssNodeToManage.getChildAt(indexToRemove).getReactTag();
-        indicesToRemove[numToMove + i] = indexToRemove;
-        tagsToRemove[numToMove + i] = tagToRemove;
-        tagsToDelete[i] = tagToRemove;
+      // We treat moves as an add and a delete
+      ViewAtIndex[] viewsToAdd = new ViewAtIndex[numToMove + numToAdd];
+      int[] indicesToRemove = new int[numToMove + numToRemove];
+      int[] tagsToRemove = new int[indicesToRemove.length];
+      int[] tagsToDelete = new int[numToRemove];
+
+      if (numToMove > 0) {
+        Assertions.assertNotNull(moveFrom);
+        Assertions.assertNotNull(moveTo);
+        for (int i = 0; i < numToMove; i++) {
+          int moveFromIndex = moveFrom.getInt(i);
+          int tagToMove = cssNodeToManage.getChildAt(moveFromIndex).getReactTag();
+          viewsToAdd[i] = new ViewAtIndex(
+              tagToMove,
+              moveTo.getInt(i));
+          indicesToRemove[i] = moveFromIndex;
+          tagsToRemove[i] = tagToMove;
+        }
       }
-    }
 
-    // NB: moveFrom and removeFrom are both relative to the starting state of the View's children.
-    // moveTo and addAt are both relative to the final state of the View's children.
-    //
-    // 1) Sort the views to add and indices to remove by index
-    // 2) Iterate the indices being removed from high to low and remove them. Going high to low
-    //    makes sure we remove the correct index when there are multiple to remove.
-    // 3) Iterate the views being added by index low to high and add them. Like the view removal,
-    //    iteration direction is important to preserve the correct index.
-
-    Arrays.sort(viewsToAdd, ViewAtIndex.COMPARATOR);
-    Arrays.sort(indicesToRemove);
-
-    // Apply changes to CSSNodeDEPRECATED hierarchy
-    int lastIndexRemoved = -1;
-    for (int i = indicesToRemove.length - 1; i >= 0; i--) {
-      int indexToRemove = indicesToRemove[i];
-      if (indexToRemove == lastIndexRemoved) {
-        throw new IllegalViewOperationException("Repeated indices in Removal list for view tag: "
-            + viewTag);
+      if (numToAdd > 0) {
+        Assertions.assertNotNull(addChildTags);
+        Assertions.assertNotNull(addAtIndices);
+        for (int i = 0; i < numToAdd; i++) {
+          int viewTagToAdd = addChildTags.getInt(i);
+          int indexToAddAt = addAtIndices.getInt(i);
+          viewsToAdd[numToMove + i] = new ViewAtIndex(viewTagToAdd, indexToAddAt);
+        }
       }
-      cssNodeToManage.removeChildAt(indicesToRemove[i]);
-      lastIndexRemoved = indicesToRemove[i];
-    }
 
-    for (int i = 0; i < viewsToAdd.length; i++) {
-      ViewAtIndex viewAtIndex = viewsToAdd[i];
-      ReactShadowNode cssNodeToAdd = mShadowNodeRegistry.getNode(viewAtIndex.mTag);
-      if (cssNodeToAdd == null) {
-        throw new IllegalViewOperationException("Trying to add unknown view tag: "
-            + viewAtIndex.mTag);
+      if (numToRemove > 0) {
+        Assertions.assertNotNull(removeFrom);
+        for (int i = 0; i < numToRemove; i++) {
+          int indexToRemove = removeFrom.getInt(i);
+          int tagToRemove = cssNodeToManage.getChildAt(indexToRemove).getReactTag();
+          indicesToRemove[numToMove + i] = indexToRemove;
+          tagsToRemove[numToMove + i] = tagToRemove;
+          tagsToDelete[i] = tagToRemove;
+        }
       }
-      cssNodeToManage.addChildAt(cssNodeToAdd, viewAtIndex.mIndex);
-    }
 
-    if (!cssNodeToManage.isVirtual() && !cssNodeToManage.isVirtualAnchor()) {
-      mNativeViewHierarchyOptimizer.handleManageChildren(
-          cssNodeToManage,
-          indicesToRemove,
-          tagsToRemove,
-          viewsToAdd,
-          tagsToDelete);
-    }
+      // NB: moveFrom and removeFrom are both relative to the starting state of the View's children.
+      // moveTo and addAt are both relative to the final state of the View's children.
+      //
+      // 1) Sort the views to add and indices to remove by index
+      // 2) Iterate the indices being removed from high to low and remove them. Going high to low
+      //    makes sure we remove the correct index when there are multiple to remove.
+      // 3) Iterate the views being added by index low to high and add them. Like the view removal,
+      //    iteration direction is important to preserve the correct index.
 
-    for (int i = 0; i < tagsToDelete.length; i++) {
-      removeShadowNode(mShadowNodeRegistry.getNode(tagsToDelete[i]));
+      Arrays.sort(viewsToAdd, ViewAtIndex.COMPARATOR);
+      Arrays.sort(indicesToRemove);
+
+      // Apply changes to CSSNodeDEPRECATED hierarchy
+      int lastIndexRemoved = -1;
+      for (int i = indicesToRemove.length - 1; i >= 0; i--) {
+        int indexToRemove = indicesToRemove[i];
+        if (indexToRemove == lastIndexRemoved) {
+          throw new IllegalViewOperationException("Repeated indices in Removal list for view tag: "
+              + viewTag);
+        }
+        cssNodeToManage.removeChildAt(indicesToRemove[i]);
+        lastIndexRemoved = indicesToRemove[i];
+      }
+
+      for (int i = 0; i < viewsToAdd.length; i++) {
+        ViewAtIndex viewAtIndex = viewsToAdd[i];
+        ReactShadowNode cssNodeToAdd = mShadowNodeRegistry.getNode(viewAtIndex.mTag);
+        if (cssNodeToAdd == null) {
+          throw new IllegalViewOperationException("Trying to add unknown view tag: "
+              + viewAtIndex.mTag);
+        }
+        cssNodeToManage.addChildAt(cssNodeToAdd, viewAtIndex.mIndex);
+      }
+
+      if (!cssNodeToManage.isVirtual() && !cssNodeToManage.isVirtualAnchor()) {
+        mNativeViewHierarchyOptimizer.handleManageChildren(
+            cssNodeToManage,
+            indicesToRemove,
+            tagsToRemove,
+            viewsToAdd,
+            tagsToDelete);
+      }
+
+      for (int i = 0; i < tagsToDelete.length; i++) {
+        removeShadowNode(mShadowNodeRegistry.getNode(tagsToDelete[i]));
+      }
     }
   }
 
@@ -470,22 +485,23 @@ public class UIImplementation {
   public void setChildren(
     int viewTag,
     ReadableArray childrenTags) {
+    synchronized (uiImplementationThreadLock) {
+      ReactShadowNode cssNodeToManage = mShadowNodeRegistry.getNode(viewTag);
 
-    ReactShadowNode cssNodeToManage = mShadowNodeRegistry.getNode(viewTag);
-
-    for (int i = 0; i < childrenTags.size(); i++) {
-      ReactShadowNode cssNodeToAdd = mShadowNodeRegistry.getNode(childrenTags.getInt(i));
-      if (cssNodeToAdd == null) {
-        throw new IllegalViewOperationException("Trying to add unknown view tag: "
-          + childrenTags.getInt(i));
+      for (int i = 0; i < childrenTags.size(); i++) {
+        ReactShadowNode cssNodeToAdd = mShadowNodeRegistry.getNode(childrenTags.getInt(i));
+        if (cssNodeToAdd == null) {
+          throw new IllegalViewOperationException("Trying to add unknown view tag: "
+            + childrenTags.getInt(i));
+        }
+        cssNodeToManage.addChildAt(cssNodeToAdd, i);
       }
-      cssNodeToManage.addChildAt(cssNodeToAdd, i);
-    }
 
-    if (!cssNodeToManage.isVirtual() && !cssNodeToManage.isVirtualAnchor()) {
-      mNativeViewHierarchyOptimizer.handleSetChildren(
-        cssNodeToManage,
-        childrenTags);
+      if (!cssNodeToManage.isVirtual() && !cssNodeToManage.isVirtualAnchor()) {
+        mNativeViewHierarchyOptimizer.handleSetChildren(
+          cssNodeToManage,
+          childrenTags);
+      }
     }
   }
 
@@ -703,7 +719,7 @@ public class UIImplementation {
           }
 
           if (mLayoutUpdateListener != null) {
-            mLayoutUpdateListener.onLayoutUpdated(cssRoot);
+            mOperationsQueue.enqueueLayoutUpdateFinished(cssRoot, mLayoutUpdateListener);
           }
         }
       }
@@ -770,8 +786,14 @@ public class UIImplementation {
   }
 
   public void setJSResponder(int reactTag, boolean blockNativeResponder) {
-    assertViewExists(reactTag, "setJSResponder");
     ReactShadowNode node = mShadowNodeRegistry.getNode(reactTag);
+
+    if (node == null) {
+      //TODO: this should only happen when using Fabric renderer. This is a temporary approach
+      //and it will be refactored when fabric supports JS Responder.
+      return;
+    }
+
     while (node.isVirtual() || node.isLayoutOnly()) {
       node = node.getParent();
     }
@@ -782,7 +804,7 @@ public class UIImplementation {
     mOperationsQueue.enqueueClearJSResponder();
   }
 
-  public void dispatchViewManagerCommand(int reactTag, int commandId, ReadableArray commandArgs) {
+  public void dispatchViewManagerCommand(int reactTag, int commandId, @Nullable ReadableArray commandArgs) {
     assertViewExists(reactTag, "dispatchViewManagerCommand");
     mOperationsQueue.enqueueDispatchCommand(reactTag, commandId, commandArgs);
   }
@@ -800,6 +822,10 @@ public class UIImplementation {
   public void showPopupMenu(int reactTag, ReadableArray items, Callback error, Callback success) {
     assertViewExists(reactTag, "showPopupMenu");
     mOperationsQueue.enqueueShowPopupMenu(reactTag, items, error, success);
+  }
+
+  public void dismissPopupMenu() {
+    mOperationsQueue.enqueueDismissPopupMenu();
   }
 
   public void sendAccessibilityEvent(int tag, int eventType) {
@@ -1003,7 +1029,7 @@ public class UIImplementation {
     ReactShadowNode node = resolveShadowNode(reactTag);
     int rootTag = 0;
     if (node != null) {
-      rootTag = node.getRootNode().getReactTag();
+      rootTag = node.getRootTag();
     } else {
       FLog.w(
         ReactConstants.TAG,

@@ -219,6 +219,8 @@ typedef void (^data_callback)(RCTSRWebSocket *webSocket,  NSData *data);
 
   BOOL _isPumping;
 
+  BOOL _cleanupScheduled;
+
   NSMutableSet<NSArray *> *_scheduledRunloops;
 
   // We use this to retain ourselves.
@@ -495,7 +497,7 @@ RCT_NOT_IMPLEMENTED(- (instancetype)init)
   CFWriteStreamRef writeStream = NULL;
 
   CFStreamCreatePairWithSocketToHost(NULL, (__bridge CFStringRef)host, port, &readStream, &writeStream);
-  
+
   CFDictionaryRef proxyDict = CFNetworkCopySystemProxySettings();
   if (proxyDict) {
     CFStringRef httpHost = CFDictionaryGetValue(proxyDict, kCFStreamPropertyHTTPProxyHost);
@@ -510,7 +512,7 @@ RCT_NOT_IMPLEMENTED(- (instancetype)init)
     }
     CFRelease(proxyDict);
   }
-  
+
   _outputStream = CFBridgingRelease(writeStream);
   _inputStream = CFBridgingRelease(readStream);
 
@@ -636,7 +638,7 @@ RCT_NOT_IMPLEMENTED(- (instancetype)init)
       }];
 
       self.readyState = RCTSR_CLOSED;
-      
+
       RCTSRLog(@"Failing with error %@", error.localizedDescription);
 
       [self _disconnect];
@@ -1046,12 +1048,7 @@ static const uint8_t RCTSRPayloadLenMask   = 0x7F;
       !_sentClose) {
     _sentClose = YES;
 
-    [_outputStream close];
-    [_inputStream close];
-
-    for (NSArray *runLoop in [_scheduledRunloops copy]) {
-      [self unscheduleFromRunLoop:runLoop[0] forMode:runLoop[1]];
-    }
+    [self _scheduleCleanup];
 
     if (!_failed) {
       [self _performDelegateBlock:^{
@@ -1060,8 +1057,6 @@ static const uint8_t RCTSRPayloadLenMask   = 0x7F;
         }
       }];
     }
-
-    _selfRetain = nil;
   }
 }
 
@@ -1379,7 +1374,7 @@ static const size_t RCTSRFrameHeaderOverhead = 32;
         return;
       }
       assert(self->_readBuffer);
-      
+
       if (self.readyState == RCTSR_CONNECTING && aStream == self->_inputStream) {
         [self didConnect];
       }
@@ -1387,7 +1382,7 @@ static const size_t RCTSRFrameHeaderOverhead = 32;
       [self _pumpScanner];
       break;
     }
-      
+
     case NSStreamEventErrorOccurred: {
       RCTSRLog(@"NSStreamEventErrorOccurred %@ %@", aStream, [aStream.streamError copy]);
       // TODO: specify error better!
@@ -1395,9 +1390,9 @@ static const size_t RCTSRFrameHeaderOverhead = 32;
       self->_readBufferOffset = 0;
       self->_readBuffer.length = 0;
       break;
-      
+
     }
-      
+
     case NSStreamEventEndEncountered: {
       [self _pumpScanner];
       RCTSRLog(@"NSStreamEventEndEncountered %@", aStream);
@@ -1409,7 +1404,7 @@ static const size_t RCTSRFrameHeaderOverhead = 32;
             self.readyState = RCTSR_CLOSED;
             [self _scheduleCleanup];
           }
-          
+
           if (!self->_sentClose && !self->_failed) {
             self->_sentClose = YES;
             // If we get closed in this state it's probably not clean because we should be sending this when we send messages
@@ -1421,24 +1416,24 @@ static const size_t RCTSRFrameHeaderOverhead = 32;
           }
         });
       }
-      
+
       break;
     }
-      
+
     case NSStreamEventHasBytesAvailable: {
       RCTSRLog(@"NSStreamEventHasBytesAvailable %@", aStream);
       const int bufferSize = 2048;
       uint8_t buffer[bufferSize];
-      
+
       while (self->_inputStream.hasBytesAvailable) {
         NSInteger bytes_read = [self->_inputStream read:buffer maxLength:bufferSize];
-        
+
         if (bytes_read > 0) {
           [self->_readBuffer appendBytes:buffer length:bytes_read];
         } else if (bytes_read < 0) {
           [self _failWithError:self->_inputStream.streamError];
         }
-        
+
         if (bytes_read != bufferSize) {
           break;
         }
@@ -1446,13 +1441,13 @@ static const size_t RCTSRFrameHeaderOverhead = 32;
       [self _pumpScanner];
       break;
     }
-      
+
     case NSStreamEventHasSpaceAvailable: {
       RCTSRLog(@"NSStreamEventHasSpaceAvailable %@", aStream);
       [self _pumpWriting];
       break;
     }
-      
+
     default:
       RCTSRLog(@"(default)  %@", aStream);
       break;
@@ -1467,7 +1462,7 @@ static const size_t RCTSRFrameHeaderOverhead = 32;
 
   _cleanupScheduled = YES;
 
-  // Cleanup NSStream delegate's in the same RunLoop used by the streams themselves:
+  // Cleanup NSStream's delegate in the same RunLoop used by the streams themselves:
   // This way we'll prevent race conditions between handleEvent and SRWebsocket's dealloc
   NSTimer *timer = [NSTimer timerWithTimeInterval:(0.0f) target:self selector:@selector(_cleanupSelfReference:) userInfo:nil repeats:NO];
   [[NSRunLoop RCTSR_networkRunLoop] addTimer:timer forMode:NSDefaultRunLoopMode];
@@ -1484,7 +1479,7 @@ static const size_t RCTSRFrameHeaderOverhead = 32;
     [self unscheduleFromRunLoop:runLoop[0] forMode:runLoop[1]];
   }
 
-  // Nuke NSStream delegate's
+  // Nuke NSStream's delegate
   _inputStream.delegate = nil;
   _outputStream.delegate = nil;
 

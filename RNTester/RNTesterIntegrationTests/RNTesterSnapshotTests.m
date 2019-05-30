@@ -1,10 +1,8 @@
 /**
- * Copyright (c) 2015-present, Facebook, Inc.
- * All rights reserved.
+ * Copyright (c) Facebook, Inc. and its affiliates.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
  *
  */
 
@@ -24,11 +22,9 @@
 
 - (void)setUp
 {
-  _runner = RCTInitRunnerForApp(@"RNTester/js/RNTesterApp.ios", nil);
-  if ([[[UIDevice currentDevice] systemVersion] floatValue] >= 11) {
-    _runner.testSuffix = @"-iOS11";
-  } else if ([[[UIDevice currentDevice] systemVersion] floatValue] >= 10) {
-    _runner.testSuffix = @"-iOS10";
+  _runner = RCTInitRunnerForApp(@"RNTester/js/RNTesterApp.ios", nil, nil);
+  if ([[[UIDevice currentDevice] systemVersion] floatValue] >= 10) {
+    _runner.testSuffix = [NSString stringWithFormat:@"-iOS%d", UIDevice.currentDevice.systemVersion.intValue];
   }
   _runner.recordMode = NO;
 }
@@ -44,6 +40,11 @@ RCT_TEST(LayoutExample)
 RCT_TEST(ARTExample)
 RCT_TEST(ScrollViewExample)
 RCT_TEST(TextExample)
+#if !TARGET_OS_TV
+// No switch or slider available on tvOS
+RCT_TEST(SwitchExample)
+RCT_TEST(SliderExample)
+#endif
 
 - (void)testZZZNotInRecordMode
 {

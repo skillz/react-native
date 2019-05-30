@@ -1,10 +1,8 @@
 /**
- * Copyright (c) 2015-present, Facebook, Inc.
- * All rights reserved.
+ * Copyright (c) Facebook, Inc. and its affiliates.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
  */
 
 #import "RCTDeviceInfo.h"
@@ -12,11 +10,13 @@
 #import "RCTAccessibilityManager.h"
 #import "RCTAssert.h"
 #import "RCTEventDispatcher.h"
+#import "RCTUIUtils.h"
 #import "RCTUtils.h"
 
 @implementation RCTDeviceInfo {
 #if !TARGET_OS_TV
   UIInterfaceOrientation _currentInterfaceOrientation;
+  NSDictionary *_currentInterfaceDimensions;
 #endif
 }
 
@@ -49,6 +49,13 @@ RCT_EXPORT_MODULE()
                                            selector:@selector(interfaceOrientationDidChange)
                                                name:UIApplicationDidChangeStatusBarOrientationNotification
                                              object:nil];
+
+  _currentInterfaceDimensions = RCTExportedDimensions(_bridge);
+
+  [[NSNotificationCenter defaultCenter] addObserver:self
+                                           selector:@selector(interfaceFrameDidChange)
+                                               name:UIApplicationDidBecomeActiveNotification
+                                             object:nil];
 #endif
 }
 
@@ -59,10 +66,15 @@ static BOOL RCTIsIPhoneX() {
   dispatch_once(&onceToken, ^{
     RCTAssertMainQueue();
 
-    isIPhoneX = CGSizeEqualToSize(
-      [UIScreen mainScreen].nativeBounds.size,
-      CGSizeMake(1125, 2436)
-    );
+    CGSize screenSize = [UIScreen mainScreen].nativeBounds.size;
+    CGSize iPhoneXScreenSize = CGSizeMake(1125, 2436);
+    CGSize iPhoneXMaxScreenSize = CGSizeMake(1242, 2688);
+    CGSize iPhoneXRScreenSize = CGSizeMake(828, 1792);
+
+    isIPhoneX =
+      CGSizeEqualToSize(screenSize, iPhoneXScreenSize) ||
+      CGSizeEqualToSize(screenSize, iPhoneXMaxScreenSize) ||
+      CGSizeEqualToSize(screenSize, iPhoneXRScreenSize);
   });
 
   return isIPhoneX;
@@ -72,18 +84,25 @@ static NSDictionary *RCTExportedDimensions(RCTBridge *bridge)
 {
   RCTAssertMainQueue();
 
-  // Don't use RCTScreenSize since it the interface orientation doesn't apply to it
-  CGRect screenSize = [[UIScreen mainScreen] bounds];
-  NSDictionary *dims = @{
-                         @"width": @(screenSize.size.width),
-                         @"height": @(screenSize.size.height),
-                         @"scale": @(RCTScreenScale()),
-                         @"fontScale": @(bridge.accessibilityManager.multiplier)
-                         };
+  RCTDimensions dimensions = RCTGetDimensions(bridge.accessibilityManager.multiplier);
+  typeof (dimensions.window) window = dimensions.window;
+  NSDictionary<NSString *, NSNumber *> *dimsWindow = @{
+      @"width": @(window.width),
+      @"height": @(window.height),
+      @"scale": @(window.scale),
+      @"fontScale": @(window.fontScale)
+  };
+  typeof (dimensions.screen) screen = dimensions.screen;
+  NSDictionary<NSString *, NSNumber *> *dimsScreen = @{
+      @"width": @(screen.width),
+      @"height": @(screen.height),
+      @"scale": @(screen.scale),
+      @"fontScale": @(screen.fontScale)
+  };
   return @{
-           @"window": dims,
-           @"screen": dims
-           };
+      @"window": dimsWindow,
+      @"screen": dimsScreen
+  };
 }
 
 - (void)dealloc
@@ -101,10 +120,15 @@ static NSDictionary *RCTExportedDimensions(RCTBridge *bridge)
 
 - (NSDictionary<NSString *, id> *)constantsToExport
 {
+  return [self getConstants];
+}
+
+- (NSDictionary<NSString *, id> *)getConstants
+{
   return @{
     @"Dimensions": RCTExportedDimensions(_bridge),
     // Note:
-    // This prop is deprecated and will be removed right after June 01, 2018.
+    // This prop is deprecated and will be removed in a future release.
     // Please use this only for a quick and temporary solution.
     // Use <SafeAreaView> instead.
     @"isIPhoneX_deprecated": @(RCTIsIPhoneX()),
@@ -152,6 +176,31 @@ static NSDictionary *RCTExportedDimensions(RCTBridge *bridge)
       }
 
   _currentInterfaceOrientation = nextOrientation;
+}
+
+
+- (void)interfaceFrameDidChange
+{
+  __weak typeof(self) weakSelf = self;
+  RCTExecuteOnMainQueue(^{
+    [weakSelf _interfaceFrameDidChange];
+  });
+}
+
+
+- (void)_interfaceFrameDidChange
+{
+  NSDictionary *nextInterfaceDimensions = RCTExportedDimensions(_bridge);
+
+  if (!([nextInterfaceDimensions isEqual:_currentInterfaceDimensions])) {
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+      [_bridge.eventDispatcher sendDeviceEventWithName:@"didUpdateDimensions"
+                                                  body:nextInterfaceDimensions];
+#pragma clang diagnostic pop
+  }
+
+  _currentInterfaceDimensions = nextInterfaceDimensions;
 }
 
 #endif // TARGET_OS_TV

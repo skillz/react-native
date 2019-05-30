@@ -1,13 +1,10 @@
 /**
- * Copyright (c) 2015-present, Facebook, Inc.
- * All rights reserved.
+ * Copyright (c) Facebook, Inc. and its affiliates.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
  *
- * @providesModule AnimatedWithChildren
- * @flow
+ * @flow strict-local
  * @format
  */
 'use strict';
@@ -34,6 +31,7 @@ class AnimatedWithChildren extends AnimatedNode {
         );
       }
     }
+    super.__makeNative();
   }
 
   __addChild(child: AnimatedNode): void {
@@ -71,6 +69,17 @@ class AnimatedWithChildren extends AnimatedNode {
 
   __getChildren(): Array<AnimatedNode> {
     return this._children;
+  }
+
+  __callListeners(value: number): void {
+    super.__callListeners(value);
+    if (!this.__isNative) {
+      for (const child of this._children) {
+        if (child.__getValue) {
+          child.__callListeners(child.__getValue());
+        }
+      }
+    }
   }
 }
 

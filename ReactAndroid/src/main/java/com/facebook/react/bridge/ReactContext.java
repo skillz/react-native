@@ -1,10 +1,8 @@
 /**
- * Copyright (c) 2015-present, Facebook, Inc.
- * All rights reserved.
+ * Copyright (c) Facebook, Inc. and its affiliates.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
  */
 
 package com.facebook.react.bridge;
@@ -44,7 +42,6 @@ public class ReactContext extends ContextWrapper {
   private @Nullable CatalystInstance mCatalystInstance;
   private @Nullable LayoutInflater mInflater;
   private @Nullable MessageQueueThread mUiMessageQueueThread;
-  private @Nullable MessageQueueThread mUiBackgroundMessageQueueThread;
   private @Nullable MessageQueueThread mNativeModulesMessageQueueThread;
   private @Nullable MessageQueueThread mJSMessageQueueThread;
   private @Nullable NativeModuleCallExceptionHandler mNativeModuleCallExceptionHandler;
@@ -69,9 +66,17 @@ public class ReactContext extends ContextWrapper {
 
     ReactQueueConfiguration queueConfig = catalystInstance.getReactQueueConfiguration();
     mUiMessageQueueThread = queueConfig.getUIQueueThread();
-    mUiBackgroundMessageQueueThread = queueConfig.getUIBackgroundQueueThread();
     mNativeModulesMessageQueueThread = queueConfig.getNativeModulesQueueThread();
     mJSMessageQueueThread = queueConfig.getJSQueueThread();
+  }
+
+  public void resetPerfStats() {
+    if (mNativeModulesMessageQueueThread != null) {
+      mNativeModulesMessageQueueThread.resetPerfStats();
+    }
+    if (mJSMessageQueueThread != null) {
+      mJSMessageQueueThread.resetPerfStats();
+    }
   }
 
   public void setNativeModuleCallExceptionHandler(
@@ -143,16 +148,20 @@ public class ReactContext extends ContextWrapper {
         case BEFORE_RESUME:
           break;
         case RESUMED:
-          runOnUiQueueThread(new Runnable() {
-            @Override
-            public void run() {
-              try {
-                listener.onHostResume();
-              } catch (RuntimeException e) {
-                handleException(e);
-              }
-            }
-          });
+          runOnUiQueueThread(
+              new Runnable() {
+                @Override
+                public void run() {
+                  if (!mLifecycleEventListeners.contains(listener)) {
+                    return;
+                  }
+                  try {
+                    listener.onHostResume();
+                  } catch (RuntimeException e) {
+                    handleException(e);
+                  }
+                }
+              });
           break;
         default:
           throw new RuntimeException("Unhandled lifecycle state.");
@@ -269,14 +278,6 @@ public class ReactContext extends ContextWrapper {
     Assertions.assertNotNull(mUiMessageQueueThread).runOnQueue(runnable);
   }
 
-  public void assertOnUiBackgroundQueueThread() {
-    Assertions.assertNotNull(mUiBackgroundMessageQueueThread).assertIsOnThread();
-  }
-
-  public void runOnUiBackgroundQueueThread(Runnable runnable) {
-    Assertions.assertNotNull(mUiBackgroundMessageQueueThread).runOnQueue(runnable);
-  }
-
   public void assertOnNativeModulesQueueThread() {
     Assertions.assertNotNull(mNativeModulesMessageQueueThread).assertIsOnThread();
   }
@@ -305,38 +306,18 @@ public class ReactContext extends ContextWrapper {
     Assertions.assertNotNull(mJSMessageQueueThread).runOnQueue(runnable);
   }
 
-  public boolean hasUIBackgroundRunnableThread() {
-    return mUiBackgroundMessageQueueThread != null;
-  }
-
-  public void assertOnUIBackgroundOrNativeModulesThread() {
-    if (mUiBackgroundMessageQueueThread == null) {
-      assertOnNativeModulesQueueThread();
-    } else {
-      assertOnUiBackgroundQueueThread();
-    }
-  }
-
-  public void runUIBackgroundRunnable(Runnable runnable) {
-    if (mUiBackgroundMessageQueueThread == null) {
-      runOnNativeModulesQueueThread(runnable);
-    } else {
-      runOnUiBackgroundQueueThread(runnable);
-    }
-  }
-
   /**
    * Passes the given exception to the current
    * {@link com.facebook.react.bridge.NativeModuleCallExceptionHandler} if one exists, rethrowing
    * otherwise.
    */
-  public void handleException(RuntimeException e) {
+  public void handleException(Exception e) {
     if (mCatalystInstance != null &&
         !mCatalystInstance.isDestroyed() &&
         mNativeModuleCallExceptionHandler != null) {
       mNativeModuleCallExceptionHandler.handleException(e);
     } else {
-      throw e;
+      throw new RuntimeException(e);
     }
   }
 
@@ -377,4 +358,5 @@ public class ReactContext extends ContextWrapper {
   public JavaScriptContextHolder getJavaScriptContextHolder() {
     return mCatalystInstance.getJavaScriptContextHolder();
   }
+
 }
