@@ -7,6 +7,7 @@
 
 package com.facebook.react.views.text;
 
+import android.support.v4.widget.TextViewCompat;
 import android.text.Spannable;
 import android.text.TextUtils;
 import android.view.Gravity;
@@ -37,6 +38,11 @@ public abstract class ReactTextAnchorViewManager<T extends View, C extends React
   private static final int[] SPACING_TYPES = {
     Spacing.ALL, Spacing.LEFT, Spacing.RIGHT, Spacing.TOP, Spacing.BOTTOM,
   };
+
+  @ReactProp(name = "adjustsFontSizeToFit", defaultBoolean = false)
+  public void setAdjustsFontSizeToFit(ReactTextView view, boolean enabled) {
+    TextViewCompat.setAutoSizeTextTypeWithDefaults(view, enabled ? TextViewCompat.AUTO_SIZE_TEXT_TYPE_UNIFORM : TextViewCompat.AUTO_SIZE_TEXT_TYPE_NONE);
+  }
 
   // maxLines can only be set in master view (block), doesn't really make sense to set in a span
   @ReactProp(name = ViewProps.NUMBER_OF_LINES, defaultInt = ViewDefaults.NUMBER_OF_LINES)
