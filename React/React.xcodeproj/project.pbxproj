@@ -1043,6 +1043,8 @@
 		8507BBC021EDACC200AEAFCA /* JSCExecutorFactory.h in Headers */ = {isa = PBXBuildFile; fileRef = 8507BBBD21EDACC200AEAFCA /* JSCExecutorFactory.h */; };
 		8507BBC121EDACC200AEAFCA /* JSCExecutorFactory.h in Headers */ = {isa = PBXBuildFile; fileRef = 8507BBBD21EDACC200AEAFCA /* JSCExecutorFactory.h */; };
 		916F9C2D1F743F57002E5920 /* RCTModalManager.m in Sources */ = {isa = PBXBuildFile; fileRef = 91076A871F743AB00081B4FA /* RCTModalManager.m */; };
+		A1A1500022A6F01B00D87830 /* RCTImageCache.h in Headers */ = {isa = PBXBuildFile; fileRef = A1A14FFF22A6F01B00D87830 /* RCTImageCache.h */; };
+		A1A1500122A6F05100D87830 /* RCTImageCache.h in Copy Headers */ = {isa = PBXBuildFile; fileRef = A1A14FFF22A6F01B00D87830 /* RCTImageCache.h */; };
 		A2440AA21DF8D854006E7BFC /* RCTReloadCommand.h in Headers */ = {isa = PBXBuildFile; fileRef = A2440AA01DF8D854006E7BFC /* RCTReloadCommand.h */; };
 		A2440AA31DF8D854006E7BFC /* RCTReloadCommand.m in Sources */ = {isa = PBXBuildFile; fileRef = A2440AA11DF8D854006E7BFC /* RCTReloadCommand.m */; };
 		A2440AA41DF8D865006E7BFC /* RCTReloadCommand.h in Headers */ = {isa = PBXBuildFile; fileRef = A2440AA01DF8D854006E7BFC /* RCTReloadCommand.h */; };
@@ -1545,6 +1547,7 @@
 			dstPath = include/React;
 			dstSubfolderSpec = 16;
 			files = (
+				A1A1500122A6F05100D87830 /* RCTImageCache.h in Copy Headers */,
 				39C50FF92046EACF00CEE534 /* RCTVersion.h in Copy Headers */,
 				591F78DE202ADB8F004A668C /* RCTLayout.h in Copy Headers */,
 				59EDBCBD1FDF4E43003573DE /* RCTScrollableProtocol.h in Copy Headers */,
@@ -2191,6 +2194,7 @@
 		8507BBBD21EDACC200AEAFCA /* JSCExecutorFactory.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = JSCExecutorFactory.h; sourceTree = "<group>"; };
 		91076A871F743AB00081B4FA /* RCTModalManager.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RCTModalManager.m; sourceTree = "<group>"; };
 		91076A881F743AB00081B4FA /* RCTModalManager.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = RCTModalManager.h; sourceTree = "<group>"; };
+		A1A14FFF22A6F01B00D87830 /* RCTImageCache.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = RCTImageCache.h; path = ../Libraries/Image/RCTImageCache.h; sourceTree = "<group>"; };
 		A2440AA01DF8D854006E7BFC /* RCTReloadCommand.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = RCTReloadCommand.h; sourceTree = "<group>"; };
 		A2440AA11DF8D854006E7BFC /* RCTReloadCommand.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = RCTReloadCommand.m; sourceTree = "<group>"; };
 		AC4A6AF821FB4EA900FBEC39 /* YGMarker.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = YGMarker.cpp; sourceTree = "<group>"; };
@@ -2829,6 +2833,7 @@
 		83CBB9F61A601CBA00E9B192 = {
 			isa = PBXGroup;
 			children = (
+				A1A14FFF22A6F01B00D87830 /* RCTImageCache.h */,
 				83CBBA2F1A601D0F00E9B192 /* React */,
 				3D788F841EBD2D240063D616 /* third-party.xcconfig */,
 				3D10A3C71DDF3CED004A0F9D /* ReactCommon */,
@@ -3437,6 +3442,7 @@
 				3D80DA431DF820620028D040 /* RCTURLRequestHandler.h in Headers */,
 				3D80DA441DF820620028D040 /* RCTUtils.h in Headers */,
 				13134C981E296B2A00B9F3CB /* RCTCxxMethod.h in Headers */,
+				A1A1500022A6F01B00D87830 /* RCTImageCache.h in Headers */,
 				3D80DA4A1DF820620028D040 /* RCTAccessibilityManager.h in Headers */,
 				3D80DA4B1DF820620028D040 /* RCTAlertManager.h in Headers */,
 				3D80DA4C1DF820620028D040 /* RCTAppState.h in Headers */,
@@ -3937,6 +3943,7 @@
 			developmentRegion = English;
 			hasScannedForEncodings = 0;
 			knownRegions = (
+				English,
 				en,
 				Base,
 			);
