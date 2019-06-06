@@ -266,7 +266,6 @@ task packageReactNdkLibsForBuck(dependsOn: packageReactNdkLibs, type: Copy) {
 
 android {
     compileSdkVersion 26
-    buildToolsVersion "26.0.3"
 
     compileOptions {
         sourceCompatibility(JavaVersion.VERSION_1_8)
@@ -275,7 +274,7 @@ android {
 
     defaultConfig {
         minSdkVersion(16)
-        targetSdkVersion(22)
+        targetSdkVersion(26)
         versionCode(1)
         versionName("1.0")
 
