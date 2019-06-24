@@ -235,6 +235,22 @@ function shouldUseNativeDriver(config: AnimationConfig | EventConfig): boolean {
   return config.useNativeDriver || false;
 }
 
+function transformDataType(value: any): number {
+  // Change the string type to number type so we can reuse the same logic in
+  // iOS and Android platform
+  if (typeof value !== 'string') {
+    return value;
+  }
+  if (/deg$/.test(value)) {
+    const degrees = parseFloat(value) || 0;
+    const radians = (degrees * Math.PI) / 180.0;
+    return radians;
+  } else {
+    // Assume radians
+    return parseFloat(value) || 0;
+  }
+}
+
 module.exports = {
   API,
   validateStyles,
@@ -244,6 +260,7 @@ module.exports = {
   generateNewAnimationId,
   assertNativeAnimatedModule,
   shouldUseNativeDriver,
+  transformDataType,
   get nativeEventEmitter() {
     if (!nativeEventEmitter) {
       nativeEventEmitter = new NativeEventEmitter(NativeAnimatedModule);
