@@ -10,6 +10,7 @@ import static com.facebook.react.modules.systeminfo.AndroidInfoHelpers.getFriend
 import android.app.Activity;
 import android.app.Application;
 import com.facebook.infer.annotation.Assertions;
+import com.facebook.hermes.reactexecutor.HermesExecutorFactory;
 import com.facebook.react.bridge.JSBundleLoader;
 import com.facebook.react.bridge.JSIModulePackage;
 import com.facebook.react.bridge.JavaScriptExecutorFactory;
@@ -23,6 +24,7 @@ import com.facebook.react.jscexecutor.JSCExecutorFactory;
 import com.facebook.react.modules.core.DefaultHardwareBackBtnHandler;
 import com.facebook.react.packagerconnection.RequestHandler;
 import com.facebook.react.uimanager.UIImplementationProvider;
+import com.facebook.soloader.SoLoader;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -246,6 +248,12 @@ public class ReactInstanceManagerBuilder {
       mApplication,
       "Application property has not been set with this builder");
 
+    if (mInitialLifecycleState == LifecycleState.RESUMED) {
+      Assertions.assertNotNull(
+        mCurrentActivity,
+        "Activity needs to be set if initial lifecycle state is resumed");
+    }
+
     Assertions.assertCondition(
       mUseDeveloperSupport || mJSBundleAssetUrl != null || mJSBundleLoader != null,
       "JS Bundle File or Asset URL has to be provided when dev support is disabled");
@@ -268,7 +276,7 @@ public class ReactInstanceManagerBuilder {
         mCurrentActivity,
         mDefaultHardwareBackBtnHandler,
         mJavaScriptExecutorFactory == null
-            ? new JSCExecutorFactory(appName, deviceName)
+            ? getDefaultJSExecutorFactory(appName, deviceName)
             : mJavaScriptExecutorFactory,
         (mJSBundleLoader == null && mJSBundleAssetUrl != null)
             ? JSBundleLoader.createAssetLoader(
@@ -288,5 +296,16 @@ public class ReactInstanceManagerBuilder {
         mMinTimeLeftInFrameForNonBatchedOperationMs,
         mJSIModulesPackage,
         mCustomPackagerCommandHandlers);
+  }
+
+  private JavaScriptExecutorFactory getDefaultJSExecutorFactory(String appName, String deviceName) {
+    try {
+      // If JSC is included, use it as normal
+      SoLoader.loadLibrary("jscexecutor");
+      return new JSCExecutorFactory(appName, deviceName);
+    } catch(UnsatisfiedLinkError jscE) {
+      // Otherwise use Hermes
+      return new HermesExecutorFactory();
+    }
   }
 }

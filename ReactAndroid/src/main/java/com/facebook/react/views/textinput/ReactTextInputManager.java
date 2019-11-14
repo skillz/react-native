@@ -13,7 +13,7 @@ import android.graphics.PorterDuff;
 import android.graphics.Typeface;
 import android.graphics.drawable.Drawable;
 import android.os.Build;
-import android.support.v4.content.ContextCompat;
+import androidx.core.content.ContextCompat;
 import android.text.Editable;
 import android.text.InputFilter;
 import android.text.InputType;
@@ -201,6 +201,8 @@ public class ReactTextInputManager extends BaseViewManager<ReactEditText, Layout
         TextInlineImageSpan.possiblyUpdateInlineImageSpans(spannable, view);
       }
       view.maybeSetText(update);
+      if (update.getSelectionStart() != UNSET && update.getSelectionEnd() != UNSET)
+        view.setSelection(update.getSelectionStart(), update.getSelectionEnd());
     }
   }
 
@@ -273,22 +275,8 @@ public class ReactTextInputManager extends BaseViewManager<ReactEditText, Layout
     }
   }
 
-  @ReactProp(name = "selection")
-  public void setSelection(ReactEditText view, @Nullable ReadableMap selection) {
-    if (selection == null) {
-      return;
-    }
-
-    if (selection.hasKey("start") && selection.hasKey("end")) {
-      view.setSelection(selection.getInt("start"), selection.getInt("end"));
-    }
-  }
-
   @ReactProp(name = "importantForAutofill")
   public void setImportantForAutofill(ReactEditText view, @Nullable String value) {
-    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
-      return;
-    }
     int mode = View.IMPORTANT_FOR_AUTOFILL_AUTO;
     if ("no".equals(value)) {
       mode = View.IMPORTANT_FOR_AUTOFILL_NO;
@@ -299,7 +287,23 @@ public class ReactTextInputManager extends BaseViewManager<ReactEditText, Layout
     } else if ("yesExcludeDescendants".equals(value)) {
       mode = View.IMPORTANT_FOR_AUTOFILL_YES_EXCLUDE_DESCENDANTS;
     }
+    setImportantForAutofill(view, mode);
+  }
+
+  private void setImportantForAutofill(ReactEditText view, int mode) {
+    // Autofill hints were added in Android API 26.
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
+      return;
+    }
     view.setImportantForAutofill(mode);
+  }
+
+  private void setAutofillHints(ReactEditText view, String... hints) {
+    // Autofill hints were added in Android API 26.
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
+      return;
+    }
+    view.setAutofillHints(hints);
   }
 
   @ReactProp(name = "onSelectionChange", defaultBoolean = false)
@@ -377,7 +381,8 @@ public class ReactTextInputManager extends BaseViewManager<ReactEditText, Layout
     setCursorColor(view, color);
   }
 
-  private void setCursorColor(ReactEditText view, @Nullable Integer color) {
+  @ReactProp(name = "cursorColor", customType = "Color")
+  public void setCursorColor(ReactEditText view, @Nullable Integer color) {
     // Evil method that uses reflection because there is no public API to changes
     // the cursor color programmatically.
     // Based on http://stackoverflow.com/questions/25996032/how-to-change-programatically-edittext-cursor-color-in-android.
@@ -572,39 +577,34 @@ public class ReactTextInputManager extends BaseViewManager<ReactEditText, Layout
 
   @ReactProp(name = "autoComplete")
   public void setTextContentType(ReactEditText view, @Nullable String autocomplete) {
-    // Autofill hints were added in Android API 26.
-    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
-      return;
-    }
-
     if (autocomplete == null) {
-      view.setImportantForAutofill(View.IMPORTANT_FOR_AUTOFILL_NO);
+      setImportantForAutofill(view, View.IMPORTANT_FOR_AUTOFILL_NO);
     } else if ("username".equals(autocomplete)) {
-      view.setAutofillHints(View.AUTOFILL_HINT_USERNAME);
+      setAutofillHints(view, View.AUTOFILL_HINT_USERNAME);
     } else if ("password".equals(autocomplete)) {
-      view.setAutofillHints(View.AUTOFILL_HINT_PASSWORD);
+      setAutofillHints(view, View.AUTOFILL_HINT_PASSWORD);
     } else if ("email".equals(autocomplete)) {
-      view.setAutofillHints(View.AUTOFILL_HINT_EMAIL_ADDRESS);
+      setAutofillHints(view, View.AUTOFILL_HINT_EMAIL_ADDRESS);
     } else if ("name".equals(autocomplete)) {
-      view.setAutofillHints(View.AUTOFILL_HINT_NAME);
+      setAutofillHints(view, View.AUTOFILL_HINT_NAME);
     } else if ("tel".equals(autocomplete)) {
-      view.setAutofillHints(View.AUTOFILL_HINT_PHONE);
+      setAutofillHints(view, View.AUTOFILL_HINT_PHONE);
     } else if ("street-address".equals(autocomplete)) {
-      view.setAutofillHints(View.AUTOFILL_HINT_POSTAL_ADDRESS);
+      setAutofillHints(view, View.AUTOFILL_HINT_POSTAL_ADDRESS);
     } else if ("postal-code".equals(autocomplete)) {
-      view.setAutofillHints(View.AUTOFILL_HINT_POSTAL_CODE);
+      setAutofillHints(view, View.AUTOFILL_HINT_POSTAL_CODE);
     } else if ("cc-number".equals(autocomplete)) {
-      view.setAutofillHints(View.AUTOFILL_HINT_CREDIT_CARD_NUMBER);
+      setAutofillHints(view, View.AUTOFILL_HINT_CREDIT_CARD_NUMBER);
     } else if ("cc-csc".equals(autocomplete)) {
-      view.setAutofillHints(View.AUTOFILL_HINT_CREDIT_CARD_SECURITY_CODE);
+      setAutofillHints(view, View.AUTOFILL_HINT_CREDIT_CARD_SECURITY_CODE);
     } else if ("cc-exp".equals(autocomplete)) {
-      view.setAutofillHints(View.AUTOFILL_HINT_CREDIT_CARD_EXPIRATION_DATE);
+      setAutofillHints(view, View.AUTOFILL_HINT_CREDIT_CARD_EXPIRATION_DATE);
     } else if ("cc-exp-month".equals(autocomplete)) {
-      view.setAutofillHints(View.AUTOFILL_HINT_CREDIT_CARD_EXPIRATION_MONTH);
+      setAutofillHints(view, View.AUTOFILL_HINT_CREDIT_CARD_EXPIRATION_MONTH);
     } else if ("cc-exp-year".equals(autocomplete)) {
-      view.setAutofillHints(View.AUTOFILL_HINT_CREDIT_CARD_EXPIRATION_YEAR);
+      setAutofillHints(view, View.AUTOFILL_HINT_CREDIT_CARD_EXPIRATION_YEAR);
     } else if ("off".equals(autocomplete)) {
-      view.setImportantForAutofill(View.IMPORTANT_FOR_AUTOFILL_NO);
+      setImportantForAutofill(view, View.IMPORTANT_FOR_AUTOFILL_NO);
     } else {
       throw new JSApplicationIllegalArgumentException("Invalid autocomplete option: " + autocomplete);
     }
@@ -714,6 +714,12 @@ public class ReactTextInputManager extends BaseViewManager<ReactEditText, Layout
   public void setBorderStyle(ReactEditText view, @Nullable String borderStyle) {
     view.setBorderStyle(borderStyle);
   }
+
+  @ReactProp(name = "showSoftInputOnFocus", defaultBoolean = true)
+  public void showKeyboardOnFocus(ReactEditText view, boolean showKeyboardOnFocus) {
+    view.setShowSoftInputOnFocus(showKeyboardOnFocus);
+  }
+
 
   @ReactPropGroup(names = {
       ViewProps.BORDER_WIDTH,
@@ -963,16 +969,22 @@ public class ReactTextInputManager extends BaseViewManager<ReactEditText, Layout
       // Android will call us back for both the SELECTION_START span and SELECTION_END span in text
       // To prevent double calling back into js we cache the result of the previous call and only
       // forward it on if we have new values
-      if (mPreviousSelectionStart != start || mPreviousSelectionEnd != end) {
+
+      // Apparently Android might call this with an end value that is less than the start value
+      // Lets normalize them. See https://github.com/facebook/react-native/issues/18579
+      int realStart = Math.min(start, end);
+      int realEnd = Math.max(start, end);
+
+      if (mPreviousSelectionStart != realStart || mPreviousSelectionEnd != realEnd) {
         mEventDispatcher.dispatchEvent(
             new ReactTextInputSelectionEvent(
                 mReactEditText.getId(),
-                start,
-                end
+                realStart,
+                realEnd
             ));
 
-        mPreviousSelectionStart = start;
-        mPreviousSelectionEnd = end;
+        mPreviousSelectionStart = realStart;
+        mPreviousSelectionEnd = realEnd;
       }
     }
   }

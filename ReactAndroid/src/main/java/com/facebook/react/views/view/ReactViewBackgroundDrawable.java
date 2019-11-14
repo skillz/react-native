@@ -646,32 +646,32 @@ public class ReactViewBackgroundDrawable extends Drawable {
     }
 
     mPathForBorderRadiusOutline.addRoundRect(
-      mTempRectForBorderRadiusOutline,
-      new float[] {
-        topLeftRadius + extraRadiusForOutline,
-        topLeftRadius + extraRadiusForOutline,
-        topRightRadius + extraRadiusForOutline,
-        topRightRadius + extraRadiusForOutline,
-        bottomRightRadius + extraRadiusForOutline,
-        bottomRightRadius + extraRadiusForOutline,
-        bottomLeftRadius + extraRadiusForOutline,
-        bottomLeftRadius + extraRadiusForOutline
-      },
-      Path.Direction.CW);
+        mTempRectForBorderRadiusOutline,
+        new float[] {
+          topLeftRadius + extraRadiusForOutline,
+          topLeftRadius + extraRadiusForOutline,
+          topRightRadius + extraRadiusForOutline,
+          topRightRadius + extraRadiusForOutline,
+          bottomRightRadius + extraRadiusForOutline,
+          bottomRightRadius + extraRadiusForOutline,
+          bottomLeftRadius + extraRadiusForOutline,
+          bottomLeftRadius + extraRadiusForOutline
+        },
+        Path.Direction.CW);
 
     mCenterDrawPath.addRoundRect(
-      mTempRectForCenterDrawPath,
-      new float[] {
-        innerTopLeftRadiusX + extraRadiusForOutline,
-        innerTopLeftRadiusY + extraRadiusForOutline,
-        innerTopRightRadiusX + extraRadiusForOutline,
-        innerTopRightRadiusY + extraRadiusForOutline,
-        innerBottomRightRadiusX + extraRadiusForOutline,
-        innerBottomRightRadiusY + extraRadiusForOutline,
-        innerBottomLeftRadiusX + extraRadiusForOutline,
-        innerBottomLeftRadiusY + extraRadiusForOutline
-      },
-      Path.Direction.CW);
+        mTempRectForCenterDrawPath,
+        new float[] {
+          innerTopLeftRadiusX + (topLeftRadius > 0 ? extraRadiusForOutline : 0),
+          innerTopLeftRadiusY + (topLeftRadius > 0 ? extraRadiusForOutline : 0),
+          innerTopRightRadiusX + (topRightRadius > 0 ? extraRadiusForOutline : 0),
+          innerTopRightRadiusY + (topRightRadius > 0 ? extraRadiusForOutline : 0),
+          innerBottomRightRadiusX + (bottomRightRadius > 0 ? extraRadiusForOutline : 0),
+          innerBottomRightRadiusY + (bottomRightRadius > 0 ? extraRadiusForOutline : 0),
+          innerBottomLeftRadiusX + (bottomLeftRadius > 0 ? extraRadiusForOutline : 0),
+          innerBottomLeftRadiusY + (bottomLeftRadius > 0 ? extraRadiusForOutline : 0)
+        },
+        Path.Direction.CW);
 
     /**
      * Rounded Multi-Colored Border Algorithm:

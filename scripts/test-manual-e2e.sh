@@ -51,7 +51,7 @@ info "and then press any key."
 info ""
 read -n 1
 
-./gradlew :RNTester:android:app:installDebug || error "Couln't build RNTester Android"
+./gradlew :RNTester:android:app:installJscDebug || error "Couln't build RNTester Android"
 
 info "Press any key to run RNTester in an already running Android emulator/device"
 info ""
@@ -76,11 +76,14 @@ npm pack
 PACKAGE=$(pwd)/react-native-$PACKAGE_VERSION.tgz
 success "Package bundled ($PACKAGE)"
 
+node scripts/set-rn-template-version.js "file:$PACKAGE"
+success "React Native version changed in the template"
+
 project_name="RNTestProject"
 
 cd /tmp/
 rm -rf "$project_name"
-react-native init "$project_name" --version $PACKAGE
+node "$repo_root/cli.js" init "$project_name" --template "$repo_root"
 
 info "Double checking the versions in package.json are correct:"
 grep "\"react-native\": \".*react-native-$PACKAGE_VERSION.tgz\"" "/tmp/${project_name}/package.json" || error "Incorrect version number in /tmp/${project_name}/package.json"
