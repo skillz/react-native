@@ -165,7 +165,7 @@ RCT_EXPORT_METHOD(close:(nonnull NSNumber *)socketID)
   _contentHandlers[socketID] = nil;
   _sockets[socketID] = nil;
   [self sendEventWithName:@"websocketFailed" body:@{
-    @"message": error.localizedDescription,
+    @"message": RCTNullIfNil(error.localizedDescription),
     @"id": socketID
   }];
 }
