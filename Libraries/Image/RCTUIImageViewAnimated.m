@@ -269,6 +269,11 @@ static NSUInteger RCTDeviceFreeMemory() {
   if (_currentFrame) {
     layer.contentsScale = self.animatedImageScale;
     layer.contents = (__bridge id)_currentFrame.CGImage;
+  } else {
+    // Fixing image not showing on iOS 14.
+    // This should be fixed on RN 63.3, but was not ported to older RN versions.
+    // Issue can be found here: https://github.com/facebook/react-native/issues/29279#issuecomment-658244428
+    [super displayLayer:layer];
   }
 }
 
